@@ -1,0 +1,1 @@
+UPDATE courses SET price = 2000 WHERE title ILIKE '%ghostwriting%';
