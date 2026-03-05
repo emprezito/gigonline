@@ -33,6 +33,9 @@ export const Navbar = () => {
           {user ? (
             <>
               <Button variant="ghost" size="sm" onClick={() => navigate(getDashboardLink())}>Dashboard</Button>
+              {hasRole("affiliate") && (
+                <Button variant="ghost" size="sm" onClick={() => navigate("/affiliate")}>Affiliate</Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => signOut()}>Sign Out</Button>
             </>
           ) : (
@@ -61,6 +64,9 @@ export const Navbar = () => {
             {user ? (
               <>
                 <Button variant="ghost" size="sm" onClick={() => { navigate(getDashboardLink()); setOpen(false); }}>Dashboard</Button>
+                {hasRole("affiliate") && (
+                  <Button variant="ghost" size="sm" onClick={() => { navigate("/affiliate"); setOpen(false); }}>Affiliate</Button>
+                )}
                 <Button variant="outline" size="sm" onClick={() => signOut()}>Sign Out</Button>
               </>
             ) : (

@@ -71,7 +71,7 @@ const Index = () => {
             </p>
             <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Button size="lg" className="gap-2 text-base" onClick={() => navigate("/signup")}>
-                Enroll Now — ₦49,999
+                Enroll Now — ₦20,000
                 <ArrowRight className="h-4 w-4" />
               </Button>
               <Button variant="outline" size="lg" className="gap-2 text-base" onClick={() => navigate("/signup?affiliate=true")}>
@@ -210,7 +210,7 @@ const Index = () => {
               <CardContent className="p-8 text-center">
                 <h3 className="font-display text-xl font-semibold">Ghostwriting Mastery</h3>
                 <div className="mt-4">
-                  <span className="font-display text-5xl font-bold">₦49,999</span>
+                  <span className="font-display text-5xl font-bold">₦20,000</span>
                   <span className="text-muted-foreground"> / one-time</span>
                 </div>
                 <ul className="mt-6 space-y-3 text-left text-sm">
