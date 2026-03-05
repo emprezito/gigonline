@@ -74,18 +74,37 @@ const Dashboard = () => {
 
   const handleEnroll = async (courseId: string) => {
     if (!user) return;
+    const course = availableCourses.find((c) => c.id === courseId);
+    if (!course) return;
+
     setEnrolling(courseId);
     try {
-      const { error } = await supabase
-        .from("enrollments")
-        .insert({ user_id: user.id, course_id: courseId });
+      // Get affiliate cookie
+      const getCookie = (name: string) => {
+        const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+        return match ? match[2] : null;
+      };
+      const affiliateId = getCookie("ref_affiliate_id") || undefined;
+
+      const { data, error } = await supabase.functions.invoke("create-payment", {
+        body: {
+          email: user.email,
+          amount: course.price,
+          courseId,
+          userId: user.id,
+          callbackUrl: `${window.location.origin}/dashboard`,
+          affiliateId,
+        },
+      });
 
       if (error) throw error;
-
-      toast({ title: "Enrolled!", description: "You now have access to this course." });
-      await fetchData();
+      if (data?.data?.authorization_url) {
+        window.location.href = data.data.authorization_url;
+      } else {
+        throw new Error("Failed to initialize payment");
+      }
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Payment Error", description: error.message, variant: "destructive" });
     } finally {
       setEnrolling(null);
     }
@@ -235,7 +254,7 @@ const Dashboard = () => {
                         disabled={enrolling === course.id}
                         onClick={() => handleEnroll(course.id)}
                       >
-                        {enrolling === course.id ? "Enrolling…" : "Enroll Now"}
+                        {enrolling === course.id ? "Processing…" : `Pay ₦${course.price.toLocaleString()}`}
                         <ArrowRight className="h-3.5 w-3.5" />
                       </Button>
                     </div>

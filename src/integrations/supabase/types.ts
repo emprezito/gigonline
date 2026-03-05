@@ -16,30 +16,45 @@ export type Database = {
     Tables: {
       affiliates: {
         Row: {
+          account_name: string | null
+          account_number: string | null
           approved: boolean
+          bank_code: string | null
+          bank_name: string | null
           commission_rate: number | null
           created_at: string
           enabled: boolean
           id: string
           referral_code: string
+          transfer_recipient_code: string | null
           user_id: string
         }
         Insert: {
+          account_name?: string | null
+          account_number?: string | null
           approved?: boolean
+          bank_code?: string | null
+          bank_name?: string | null
           commission_rate?: number | null
           created_at?: string
           enabled?: boolean
           id?: string
           referral_code: string
+          transfer_recipient_code?: string | null
           user_id: string
         }
         Update: {
+          account_name?: string | null
+          account_number?: string | null
           approved?: boolean
+          bank_code?: string | null
+          bank_name?: string | null
           commission_rate?: number | null
           created_at?: string
           enabled?: boolean
           id?: string
           referral_code?: string
+          transfer_recipient_code?: string | null
           user_id?: string
         }
         Relationships: []
