@@ -1,7 +1,10 @@
 import { GraduationCap } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
-export const Footer = () => (
+export const Footer = () => {
+  const { user } = useAuth();
+  return (
   <footer className="border-t bg-muted/30">
     <div className="container mx-auto px-4 py-12">
       <div className="grid gap-8 md:grid-cols-4">
@@ -23,9 +26,18 @@ export const Footer = () => (
         <div>
           <h4 className="font-display font-semibold mb-3">Account</h4>
           <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-            <Link to="/login" className="hover:text-foreground">Log In</Link>
-            <Link to="/signup" className="hover:text-foreground">Sign Up</Link>
-            <Link to="/signup?affiliate=true" className="hover:text-foreground">Become an Affiliate</Link>
+            {user ? (
+              <>
+                <Link to="/dashboard" className="hover:text-foreground">Dashboard</Link>
+                <Link to="/settings" className="hover:text-foreground">Become an Affiliate</Link>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="hover:text-foreground">Log In</Link>
+                <Link to="/signup" className="hover:text-foreground">Sign Up</Link>
+                <Link to="/signup?affiliate=true" className="hover:text-foreground">Become an Affiliate</Link>
+              </>
+            )}
           </div>
         </div>
         <div>
@@ -41,4 +53,5 @@ export const Footer = () => (
       </div>
     </div>
   </footer>
-);
+  );
+};
