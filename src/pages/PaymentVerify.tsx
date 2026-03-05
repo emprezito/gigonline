@@ -1,13 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const PaymentVerify = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const pollingRef = useRef(false);
 
   const reference = searchParams.get("reference") || searchParams.get("trxref");
 
@@ -15,38 +19,59 @@ const PaymentVerify = () => {
     if (authLoading) return;
     if (!user) { navigate("/login"); return; }
     if (!reference) { setStatus("error"); return; }
+    if (pollingRef.current) return;
+    pollingRef.current = true;
 
-    // Paystack redirects here after payment. The webhook handles enrollment.
-    // We just poll for the enrollment to appear.
-    let attempts = 0;
-    const maxAttempts = 15;
-
-    const poll = async () => {
-      const { supabase } = await import("@/integrations/supabase/client");
-      const { data } = await supabase
-        .from("enrollments")
-        .select("course_id")
-        .eq("user_id", user.id)
-        .order("enrolled_at", { ascending: false })
-        .limit(1);
-
-      if (data && data.length > 0) {
-        setStatus("success");
-        setTimeout(() => navigate(`/course/${data[0].course_id}`), 2000);
-        return;
+    // First verify the transaction with Paystack via edge function
+    const verifyAndPoll = async () => {
+      // Verify payment server-side
+      try {
+        await supabase.functions.invoke("verify-payment", {
+          body: { reference },
+        });
+      } catch (e) {
+        console.log("Verify-payment call failed, falling back to polling", e);
       }
 
-      attempts++;
-      if (attempts >= maxAttempts) {
-        // Enrollment might still be processing — just redirect to dashboard
-        setStatus("success");
-        setTimeout(() => navigate("/dashboard"), 2000);
-      } else {
-        setTimeout(poll, 2000);
-      }
+      // Poll for enrollment
+      let attempts = 0;
+      const maxAttempts = 20;
+
+      const poll = async () => {
+        const { data } = await supabase
+          .from("enrollments")
+          .select("course_id")
+          .eq("user_id", user!.id)
+          .order("enrolled_at", { ascending: false })
+          .limit(1);
+
+        if (data && data.length > 0) {
+          setStatus("success");
+          toast({
+            title: "🎉 Course Unlocked!",
+            description: "You have successfully unlocked this course. Enjoy learning!",
+          });
+          setTimeout(() => navigate(`/course/${data[0].course_id}`), 2500);
+          return;
+        }
+
+        attempts++;
+        if (attempts >= maxAttempts) {
+          setStatus("success");
+          toast({
+            title: "Payment Received",
+            description: "Your enrollment is being processed. Check your dashboard.",
+          });
+          setTimeout(() => navigate("/dashboard"), 2500);
+        } else {
+          setTimeout(poll, 2000);
+        }
+      };
+
+      poll();
     };
 
-    poll();
+    verifyAndPoll();
   }, [user, authLoading, reference]);
 
   return (
