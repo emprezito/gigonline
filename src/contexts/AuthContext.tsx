@@ -25,67 +25,137 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchRoles = async (userId: string) => {
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    if (data) setRoles(data.map((r) => r.role));
+  const buildReferralCode = (fullName: string, userId: string) => {
+    const base = fullName.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12);
+    const fallback = `aff${userId.replace(/-/g, "").slice(0, 8)}`;
+    return `${base || fallback}${Math.random().toString(36).slice(2, 8)}`;
+  };
+
+  const ensureAffiliateProfile = async (userId: string, fullName: string) => {
+    const { data: existingAffiliate, error: affiliateLookupError } = await supabase
+      .from("affiliates")
+      .select("id")
+      .eq("user_id", userId)
+      .limit(1);
+
+    if (affiliateLookupError) throw affiliateLookupError;
+    if (existingAffiliate && existingAffiliate.length > 0) return;
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const { error: insertError } = await supabase.from("affiliates").insert({
+        user_id: userId,
+        referral_code: buildReferralCode(fullName, userId),
+      });
+
+      if (!insertError) return;
+      if (insertError.code !== "23505") throw insertError;
+    }
+
+    throw new Error("Unable to create affiliate profile. Please try again.");
+  };
+
+  const fetchRoles = async (userId: string): Promise<AppRole[]> => {
+    const [{ data: roleRows, error: rolesError }, { data: affiliateRows, error: affiliateError }] = await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", userId),
+      supabase.from("affiliates").select("id").eq("user_id", userId).limit(1),
+    ]);
+
+    if (rolesError) throw rolesError;
+    if (affiliateError) throw affiliateError;
+
+    const nextRoles = new Set<AppRole>((roleRows ?? []).map((r) => r.role));
+    if ((affiliateRows?.length ?? 0) > 0) nextRoles.add("affiliate");
+
+    const roleList = Array.from(nextRoles);
+    setRoles(roleList);
+    return roleList;
   };
 
   useEffect(() => {
     let initialLoad = true;
 
+    const syncSession = async (session: Session | null) => {
+      try {
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          const userRoles = await fetchRoles(session.user.id);
+          const wantsAffiliate = Boolean(session.user.user_metadata?.wants_affiliate);
+
+          if (wantsAffiliate && !userRoles.includes("affiliate")) {
+            await ensureAffiliateProfile(
+              session.user.id,
+              String(session.user.user_metadata?.full_name ?? "")
+            );
+            await fetchRoles(session.user.id);
+          }
+        } else {
+          setRoles([]);
+        }
+      } catch (error) {
+        console.error("Auth sync error:", error);
+      } finally {
+        if (initialLoad) {
+          initialLoad = false;
+          setLoading(false);
+        }
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchRoles(session.user.id);
-      } else {
-        setRoles([]);
-      }
-      if (initialLoad) {
-        initialLoad = false;
-        setLoading(false);
-      }
+      await syncSession(session);
     });
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchRoles(session.user.id);
-      }
-      if (initialLoad) {
-        initialLoad = false;
-        setLoading(false);
-      }
+      await syncSession(session);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string, isAffiliate = false) => {
-    const { data, error } = await supabase.auth.signUp({
+    const signUpPayload = {
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        data: { full_name: fullName, wants_affiliate: isAffiliate },
         emailRedirectTo: window.location.origin,
       },
-    });
-    if (error) throw error;
+    };
 
-    if (isAffiliate && data.user) {
-      const referralCode = fullName.toLowerCase().replace(/\s+/g, "") + Math.random().toString(36).slice(2, 6);
-      await supabase.from("affiliates").insert({
-        user_id: data.user.id,
-        referral_code: referralCode,
-      });
-      await supabase.from("user_roles").insert({
-        user_id: data.user.id,
-        role: "affiliate" as AppRole,
-      });
+    const { data, error } = await supabase.auth.signUp(signUpPayload);
+
+    if (error) {
+      const isExistingAccount = error.message.toLowerCase().includes("already registered");
+      if (!isAffiliate || !isExistingAccount) throw error;
+
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+      if (loginError || !loginData.user) throw loginError ?? error;
+
+      await ensureAffiliateProfile(loginData.user.id, fullName || String(loginData.user.user_metadata?.full_name ?? ""));
+      await fetchRoles(loginData.user.id);
+      await supabase.auth.signOut();
+      return;
+    }
+
+    if (!isAffiliate || !data.user) return;
+
+    const looksLikeExistingUser = (data.user.identities?.length ?? 0) === 0;
+
+    if (data.session) {
+      await ensureAffiliateProfile(data.user.id, fullName);
+      await fetchRoles(data.user.id);
+      return;
+    }
+
+    if (looksLikeExistingUser) {
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+      if (loginError || !loginData.user) throw loginError ?? new Error("Unable to sign in to upgrade affiliate role.");
+
+      await ensureAffiliateProfile(loginData.user.id, fullName || String(loginData.user.user_metadata?.full_name ?? ""));
+      await fetchRoles(loginData.user.id);
+      await supabase.auth.signOut();
     }
   };
 
