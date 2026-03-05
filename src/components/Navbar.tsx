@@ -12,7 +12,6 @@ export const Navbar = () => {
 
   const getDashboardLink = () => {
     if (hasRole("admin")) return "/admin";
-    if (hasRole("affiliate")) return "/affiliate";
     return "/dashboard";
   };
 

@@ -48,9 +48,9 @@ const AdminDashboard = () => {
   const fetchAllData = async () => {
     const [coursesRes, affiliatesRes, salesRes, payoutsRes] = await Promise.all([
       supabase.from("courses").select("*").order("created_at", { ascending: false }),
-      supabase.from("affiliates").select("*, profiles(full_name)"),
+      supabase.from("affiliates").select("*, profiles!affiliates_user_id_profiles_fkey(full_name)"),
       supabase.from("sales").select("*").order("created_at", { ascending: false }),
-      supabase.from("payouts").select("*, affiliates(referral_code, profiles(full_name))").order("created_at", { ascending: false }),
+      supabase.from("payouts").select("*, affiliates(referral_code, profiles!affiliates_user_id_profiles_fkey(full_name))").order("created_at", { ascending: false }),
     ]);
     setCourses(coursesRes.data || []);
     setAffiliates(affiliatesRes.data || []);

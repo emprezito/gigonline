@@ -7,7 +7,7 @@ import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, Play, CheckCircle } from "lucide-react";
+import { BookOpen, Play, CheckCircle, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface CourseWithProgress {
@@ -19,94 +19,142 @@ interface CourseWithProgress {
   completedLessons: number;
 }
 
+interface AvailableCourse {
+  id: string;
+  title: string;
+  description: string | null;
+  price: number;
+}
+
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [courses, setCourses] = useState<CourseWithProgress[]>([]);
+  const [availableCourses, setAvailableCourses] = useState<AvailableCourse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [enrolling, setEnrolling] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/login");
       return;
     }
-    if (user) fetchEnrolledCourses();
+    if (user) fetchData();
   }, [user, authLoading]);
+
+  const fetchData = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      await Promise.all([fetchEnrolledCourses(), fetchAvailableCourses()]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAvailableCourses = async () => {
+    if (!user) return;
+    const { data: enrollments } = await supabase
+      .from("enrollments")
+      .select("course_id")
+      .eq("user_id", user.id);
+
+    const enrolledIds = new Set((enrollments ?? []).map((e) => e.course_id));
+
+    const { data: allCourses } = await supabase
+      .from("courses")
+      .select("id, title, description, price")
+      .eq("published", true);
+
+    setAvailableCourses(
+      (allCourses ?? []).filter((c) => !enrolledIds.has(c.id))
+    );
+  };
+
+  const handleEnroll = async (courseId: string) => {
+    if (!user) return;
+    setEnrolling(courseId);
+    try {
+      const { error } = await supabase
+        .from("enrollments")
+        .insert({ user_id: user.id, course_id: courseId });
+
+      if (error) throw error;
+
+      toast({ title: "Enrolled!", description: "You now have access to this course." });
+      await fetchData();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setEnrolling(null);
+    }
+  };
 
   const fetchEnrolledCourses = async () => {
     if (!user) return;
 
-    setLoading(true);
-    try {
-      const { data: enrollments, error: enrollmentsError } = await supabase
-        .from("enrollments")
-        .select("course_id")
-        .eq("user_id", user.id);
+    const { data: enrollments, error: enrollmentsError } = await supabase
+      .from("enrollments")
+      .select("course_id")
+      .eq("user_id", user.id);
 
-      if (enrollmentsError) throw enrollmentsError;
-      if (!enrollments?.length) {
-        setCourses([]);
-        return;
-      }
-
-      const courseIds = enrollments.map((enrollment) => enrollment.course_id);
-
-      const [{ data: coursesData, error: coursesError }, { data: modulesData, error: modulesError }] = await Promise.all([
-        supabase.from("courses").select("id, title, description, image_url").in("id", courseIds),
-        supabase.from("modules").select("id, course_id").in("course_id", courseIds),
-      ]);
-
-      if (coursesError) throw coursesError;
-      if (modulesError) throw modulesError;
-
-      const moduleIds = (modulesData ?? []).map((module) => module.id);
-      if (!moduleIds.length) {
-        setCourses((coursesData ?? []).map((course) => ({ ...course, totalLessons: 0, completedLessons: 0 })));
-        return;
-      }
-
-      const [{ data: lessonsData, error: lessonsError }, { data: progressData, error: progressError }] = await Promise.all([
-        supabase.from("lessons").select("id, module_id").in("module_id", moduleIds),
-        supabase
-          .from("lesson_progress")
-          .select("lesson_id")
-          .eq("user_id", user.id)
-          .eq("completed", true),
-      ]);
-
-      if (lessonsError) throw lessonsError;
-      if (progressError) throw progressError;
-
-      const moduleToCourse = new Map((modulesData ?? []).map((module) => [module.id, module.course_id]));
-      const completedLessonIds = new Set((progressData ?? []).map((progress) => progress.lesson_id));
-      const progressByCourse = new Map<string, { totalLessons: number; completedLessons: number }>();
-
-      for (const lesson of lessonsData ?? []) {
-        const courseId = moduleToCourse.get(lesson.module_id);
-        if (!courseId) continue;
-
-        const current = progressByCourse.get(courseId) ?? { totalLessons: 0, completedLessons: 0 };
-        current.totalLessons += 1;
-        if (completedLessonIds.has(lesson.id)) {
-          current.completedLessons += 1;
-        }
-        progressByCourse.set(courseId, current);
-      }
-
-      const coursesWithProgress: CourseWithProgress[] = (coursesData ?? []).map((course) => {
-        const progress = progressByCourse.get(course.id) ?? { totalLessons: 0, completedLessons: 0 };
-        return { ...course, ...progress };
-      });
-
-      setCourses(coursesWithProgress);
-    } catch (error) {
-      console.error("Failed to load dashboard courses:", error);
+    if (enrollmentsError) throw enrollmentsError;
+    if (!enrollments?.length) {
       setCourses([]);
-      toast({ title: "Error", description: "We couldn't load your courses right now.", variant: "destructive" });
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    const courseIds = enrollments.map((enrollment) => enrollment.course_id);
+
+    const [{ data: coursesData, error: coursesError }, { data: modulesData, error: modulesError }] = await Promise.all([
+      supabase.from("courses").select("id, title, description, image_url").in("id", courseIds),
+      supabase.from("modules").select("id, course_id").in("course_id", courseIds),
+    ]);
+
+    if (coursesError) throw coursesError;
+    if (modulesError) throw modulesError;
+
+    const moduleIds = (modulesData ?? []).map((module) => module.id);
+    if (!moduleIds.length) {
+      setCourses((coursesData ?? []).map((course) => ({ ...course, totalLessons: 0, completedLessons: 0 })));
+      return;
+    }
+
+    const [{ data: lessonsData, error: lessonsError }, { data: progressData, error: progressError }] = await Promise.all([
+      supabase.from("lessons").select("id, module_id").in("module_id", moduleIds),
+      supabase
+        .from("lesson_progress")
+        .select("lesson_id")
+        .eq("user_id", user.id)
+        .eq("completed", true),
+    ]);
+
+    if (lessonsError) throw lessonsError;
+    if (progressError) throw progressError;
+
+    const moduleToCourse = new Map((modulesData ?? []).map((module) => [module.id, module.course_id]));
+    const completedLessonIds = new Set((progressData ?? []).map((progress) => progress.lesson_id));
+    const progressByCourse = new Map<string, { totalLessons: number; completedLessons: number }>();
+
+    for (const lesson of lessonsData ?? []) {
+      const courseId = moduleToCourse.get(lesson.module_id);
+      if (!courseId) continue;
+
+      const current = progressByCourse.get(courseId) ?? { totalLessons: 0, completedLessons: 0 };
+      current.totalLessons += 1;
+      if (completedLessonIds.has(lesson.id)) {
+        current.completedLessons += 1;
+      }
+      progressByCourse.set(courseId, current);
+    }
+
+    const coursesWithProgress: CourseWithProgress[] = (coursesData ?? []).map((course) => {
+      const progress = progressByCourse.get(course.id) ?? { totalLessons: 0, completedLessons: 0 };
+      return { ...course, ...progress };
+    });
+
+    setCourses(coursesWithProgress);
   };
 
   if (authLoading || loading) {
@@ -124,52 +172,89 @@ const Dashboard = () => {
         <h1 className="font-display text-3xl font-bold">My Dashboard</h1>
         <p className="mt-2 text-muted-foreground">Welcome back! Continue where you left off.</p>
 
-        {courses.length === 0 ? (
-          <Card className="mt-8">
-            <CardContent className="flex flex-col items-center py-12">
-              <BookOpen className="h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 font-display text-lg font-semibold">No courses yet</h3>
-              <p className="mt-2 text-sm text-muted-foreground">Enroll in a course to get started</p>
-              <Button className="mt-4" onClick={() => navigate("/#modules")}>Browse Courses</Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {courses.map((course) => {
-              const progress = course.totalLessons > 0 ? (course.completedLessons / course.totalLessons) * 100 : 0;
-              return (
-                <Card key={course.id} className="cursor-pointer transition-shadow hover:shadow-lg" onClick={() => navigate(`/course/${course.id}`)}>
+        {/* Enrolled Courses */}
+        {courses.length > 0 && (
+          <>
+            <h2 className="mt-8 font-display text-xl font-semibold">My Courses</h2>
+            <div className="mt-4 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {courses.map((course) => {
+                const progress = course.totalLessons > 0 ? (course.completedLessons / course.totalLessons) * 100 : 0;
+                return (
+                  <Card key={course.id} className="cursor-pointer transition-shadow hover:shadow-lg" onClick={() => navigate(`/course/${course.id}`)}>
+                    <CardHeader>
+                      <CardTitle className="font-display text-lg">{course.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <Progress value={progress} className="h-2" />
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <CheckCircle className="h-3.5 w-3.5" />
+                            {course.completedLessons}/{course.totalLessons} lessons
+                          </span>
+                          <span>{Math.round(progress)}%</span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-2"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigate(`/course/${course.id}`);
+                          }}
+                        >
+                          <Play className="h-3.5 w-3.5" />
+                          Continue Learning
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Available Courses */}
+        {availableCourses.length > 0 && (
+          <>
+            <h2 className="mt-10 font-display text-xl font-semibold">Available Courses</h2>
+            <div className="mt-4 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {availableCourses.map((course) => (
+                <Card key={course.id} className="transition-shadow hover:shadow-lg">
                   <CardHeader>
                     <CardTitle className="font-display text-lg">{course.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-                      <Progress value={progress} className="h-2" />
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <CheckCircle className="h-3.5 w-3.5" />
-                          {course.completedLessons}/{course.totalLessons} lessons
-                        </span>
-                        <span>{Math.round(progress)}%</span>
-                      </div>
+                    <p className="mb-4 text-sm text-muted-foreground line-clamp-2">{course.description}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="font-display text-lg font-bold">₦{course.price.toLocaleString()}</span>
                       <Button
-                        variant="outline"
                         size="sm"
-                        className="w-full gap-2"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          navigate(`/course/${course.id}`);
-                        }}
+                        className="gap-2"
+                        disabled={enrolling === course.id}
+                        onClick={() => handleEnroll(course.id)}
                       >
-                        <Play className="h-3.5 w-3.5" />
-                        Continue Learning
+                        {enrolling === course.id ? "Enrolling…" : "Enroll Now"}
+                        <ArrowRight className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Empty state */}
+        {courses.length === 0 && availableCourses.length === 0 && (
+          <Card className="mt-8">
+            <CardContent className="flex flex-col items-center py-12">
+              <BookOpen className="h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-4 font-display text-lg font-semibold">No courses available</h3>
+              <p className="mt-2 text-sm text-muted-foreground">Check back soon for new courses</p>
+            </CardContent>
+          </Card>
         )}
       </div>
       <Footer />
