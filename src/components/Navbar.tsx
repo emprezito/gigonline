@@ -16,6 +16,12 @@ export const Navbar = () => {
     return "/dashboard";
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+    setOpen(false);
+  };
+
   return (
     <nav className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-lg">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -36,7 +42,7 @@ export const Navbar = () => {
               {hasRole("affiliate") && (
                 <Button variant="ghost" size="sm" onClick={() => navigate("/affiliate")}>Affiliate</Button>
               )}
-              <Button variant="outline" size="sm" onClick={() => signOut()}>Sign Out</Button>
+              <Button variant="outline" size="sm" onClick={handleSignOut}>Sign Out</Button>
             </>
           ) : (
             <>
@@ -67,7 +73,7 @@ export const Navbar = () => {
                 {hasRole("affiliate") && (
                   <Button variant="ghost" size="sm" onClick={() => { navigate("/affiliate"); setOpen(false); }}>Affiliate</Button>
                 )}
-                <Button variant="outline" size="sm" onClick={() => signOut()}>Sign Out</Button>
+                <Button variant="outline" size="sm" onClick={handleSignOut}>Sign Out</Button>
               </>
             ) : (
               <>

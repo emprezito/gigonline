@@ -75,21 +75,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let initialLoad = true;
 
-    const syncSession = async (session: Session | null) => {
+    const syncSession = async (nextSession: Session | null, refreshRoles = true) => {
       try {
-        setSession(session);
-        setUser(session?.user ?? null);
+        setSession(nextSession);
+        setUser(nextSession?.user ?? null);
 
-        if (session?.user) {
-          const userRoles = await fetchRoles(session.user.id);
-          const wantsAffiliate = Boolean(session.user.user_metadata?.wants_affiliate);
+        if (nextSession?.user) {
+          if (refreshRoles) {
+            const userRoles = await fetchRoles(nextSession.user.id);
+            const wantsAffiliate = Boolean(nextSession.user.user_metadata?.wants_affiliate);
 
-          if (wantsAffiliate && !userRoles.includes("affiliate")) {
-            await ensureAffiliateProfile(
-              session.user.id,
-              String(session.user.user_metadata?.full_name ?? "")
-            );
-            await fetchRoles(session.user.id);
+            if (wantsAffiliate && !userRoles.includes("affiliate")) {
+              await ensureAffiliateProfile(
+                nextSession.user.id,
+                String(nextSession.user.user_metadata?.full_name ?? "")
+              );
+              await fetchRoles(nextSession.user.id);
+            }
           }
         } else {
           setRoles([]);
@@ -104,32 +106,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      await syncSession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "INITIAL_SESSION") return;
+      const refreshRoles = event !== "TOKEN_REFRESHED";
+      void syncSession(nextSession, refreshRoles);
     });
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      await syncSession(session);
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      void syncSession(currentSession, true);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string, isAffiliate = false) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedFullName = fullName.trim();
+
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
-        data: { full_name: fullName, wants_affiliate: isAffiliate },
+        data: { full_name: normalizedFullName, wants_affiliate: isAffiliate },
         emailRedirectTo: window.location.origin,
       },
     });
     if (error) throw error;
 
-    // If user already has a session (auto-confirm enabled), set up affiliate immediately
+    // Keep sign-up fast and finish affiliate setup in the background for auto-confirmed users.
     if (isAffiliate && data.user && data.session) {
-      await ensureAffiliateProfile(data.user.id, fullName);
-      await fetchRoles(data.user.id);
+      void (async () => {
+        try {
+          await ensureAffiliateProfile(data.user!.id, normalizedFullName);
+          await fetchRoles(data.user!.id);
+        } catch (setupError) {
+          console.error("Affiliate setup error:", setupError);
+        }
+      })();
     }
   };
 
@@ -141,7 +154,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const normalizedEmail = email.trim().toLowerCase();
+    const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (error) throw error;
   };
 
