@@ -8,14 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const ProfileSettings = () => {
-  const { user } = useAuth();
+  const { user, hasRole, becomeAffiliate } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [affiliateLoading, setAffiliateLoading] = useState(false);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile", user?.id],
@@ -29,7 +30,6 @@ const ProfileSettings = () => {
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
 
-  // Set form values when profile loads
   if (profile && !fullName && !bio) {
     setFullName(profile.full_name || "");
     setBio(profile.bio || "");
@@ -47,7 +47,6 @@ const ProfileSettings = () => {
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [changingPw, setChangingPw] = useState(false);
 
@@ -57,12 +56,23 @@ const ProfileSettings = () => {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       toast({ title: "Password updated!" });
-      setCurrentPassword("");
       setNewPassword("");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setChangingPw(false);
+    }
+  };
+
+  const handleBecomeAffiliate = async () => {
+    setAffiliateLoading(true);
+    try {
+      await becomeAffiliate();
+      toast({ title: "You're now an affiliate!", description: "Visit your Affiliate Dashboard to get your referral link." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setAffiliateLoading(false);
     }
   };
 
@@ -94,6 +104,26 @@ const ProfileSettings = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {!hasRole("affiliate") && (
+          <Card className="mt-6 border-primary/30">
+            <CardHeader>
+              <CardTitle className="font-display flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                Become an Affiliate
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Earn commissions by sharing your unique referral link. When someone enrolls through your link, you get paid!
+              </p>
+              <Button onClick={handleBecomeAffiliate} disabled={affiliateLoading} className="gap-2">
+                {affiliateLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Join the Affiliate Program
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="mt-6">
           <CardHeader>

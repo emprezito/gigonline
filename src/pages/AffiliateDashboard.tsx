@@ -7,8 +7,9 @@ import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MousePointerClick, DollarSign, TrendingUp, Copy, Share2 } from "lucide-react";
+import { MousePointerClick, DollarSign, TrendingUp, Copy, Share2, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const AffiliateDashboard = () => {
@@ -54,7 +55,8 @@ const AffiliateDashboard = () => {
       .eq("status", "completed")
       .order("created_at", { ascending: false });
     setSales(salesData || []);
-    setTotalEarnings(salesData?.reduce((sum, s) => sum + (s.commission_amount || 0), 0) || 0);
+    const earnings = salesData?.reduce((sum, s) => sum + (s.commission_amount || 0), 0) || 0;
+    setTotalEarnings(earnings);
 
     const { data: payouts } = await supabase
       .from("payouts")
@@ -62,7 +64,7 @@ const AffiliateDashboard = () => {
       .eq("affiliate_id", aff.id)
       .eq("status", "paid");
     const paidAmount = payouts?.reduce((sum, p) => sum + p.amount, 0) || 0;
-    setPendingPayouts(totalEarnings - paidAmount);
+    setPendingPayouts(earnings - paidAmount);
 
     setLoading(false);
   };
@@ -100,6 +102,37 @@ const AffiliateDashboard = () => {
     );
   }
 
+  const getStatusConfig = () => {
+    if (!affiliate) return null;
+    if (!affiliate.enabled) {
+      return {
+        icon: XCircle,
+        variant: "destructive" as const,
+        label: "Disabled",
+        message: "Your affiliate account has been disabled. Please contact support for assistance.",
+        color: "border-destructive/30 bg-destructive/5",
+      };
+    }
+    if (!affiliate.approved) {
+      return {
+        icon: AlertCircle,
+        variant: "secondary" as const,
+        label: "Pending Approval",
+        message: "Your affiliate account is pending approval. You can still share your referral link — commissions will be tracked and paid once approved.",
+        color: "border-primary/30 bg-accent/50",
+      };
+    }
+    return {
+      icon: CheckCircle2,
+      variant: "default" as const,
+      label: "Active",
+      message: "Your affiliate account is active. Share your referral link and start earning commissions!",
+      color: "border-green-500/30 bg-green-500/5",
+    };
+  };
+
+  const status = getStatusConfig();
+
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -107,10 +140,18 @@ const AffiliateDashboard = () => {
         <h1 className="font-display text-3xl font-bold">Affiliate Dashboard</h1>
         <p className="mt-2 text-muted-foreground">Track your referrals and earnings</p>
 
-        {!affiliate?.approved && (
-          <Card className="mt-4 border-primary/20 bg-accent/50">
-            <CardContent className="py-4">
-              <p className="text-sm">Your affiliate account is pending approval. You'll be notified once approved.</p>
+        {/* Status Banner */}
+        {status && (
+          <Card className={`mt-4 ${status.color}`}>
+            <CardContent className="flex items-start gap-3 py-4">
+              <status.icon className="mt-0.5 h-5 w-5 shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm">Account Status</span>
+                  <Badge variant={status.variant}>{status.label}</Badge>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{status.message}</p>
+              </div>
             </CardContent>
           </Card>
         )}
