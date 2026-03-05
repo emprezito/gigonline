@@ -48,12 +48,22 @@ const AdminDashboard = () => {
   const fetchAllData = async () => {
     const [coursesRes, affiliatesRes, salesRes, payoutsRes] = await Promise.all([
       supabase.from("courses").select("*").order("created_at", { ascending: false }),
-      supabase.from("affiliates").select("*, profiles!affiliates_user_id_profiles_fkey(full_name)"),
+      supabase.from("affiliates").select("*"),
       supabase.from("sales").select("*").order("created_at", { ascending: false }),
-      supabase.from("payouts").select("*, affiliates(referral_code, profiles!affiliates_user_id_profiles_fkey(full_name))").order("created_at", { ascending: false }),
+      supabase.from("payouts").select("*, affiliates(referral_code)").order("created_at", { ascending: false }),
     ]);
+
+    // Fetch profile names for affiliates
+    const affData = affiliatesRes.data || [];
+    if (affData.length > 0) {
+      const userIds = affData.map((a: any) => a.user_id);
+      const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", userIds);
+      const profileMap = Object.fromEntries((profiles || []).map((p: any) => [p.id, p.full_name]));
+      affData.forEach((a: any) => { a.profile_name = profileMap[a.user_id] || "—"; });
+    }
+
     setCourses(coursesRes.data || []);
-    setAffiliates(affiliatesRes.data || []);
+    setAffiliates(affData);
     setSales(salesRes.data || []);
     setPayouts(payoutsRes.data || []);
     setLoading(false);
@@ -327,7 +337,7 @@ const AdminDashboard = () => {
                   <TableBody>
                     {affiliates.map((aff) => (
                       <TableRow key={aff.id}>
-                        <TableCell>{(aff as any).profiles?.full_name || "—"}</TableCell>
+                        <TableCell>{aff.profile_name || "—"}</TableCell>
                         <TableCell className="font-mono text-sm">{aff.referral_code}</TableCell>
                         <TableCell>
                           <Switch checked={aff.approved} onCheckedChange={(v) => toggleAffiliate(aff.id, "approved", v)} />

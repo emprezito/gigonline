@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
 import { BookOpen, Users, DollarSign, CheckCircle, Star, Play, ArrowRight, Zap, Target, TrendingUp } from "lucide-react";
 
@@ -40,6 +41,8 @@ const faqs = [
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const affiliateLink = user ? "/settings" : "/signup?affiliate=true";
 
   return (
     <div className="min-h-screen">
@@ -74,7 +77,7 @@ const Index = () => {
                 Enroll Now — ₦20,000
                 <ArrowRight className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="lg" className="gap-2 text-base" onClick={() => navigate("/signup?affiliate=true")}>
+              <Button variant="outline" size="lg" className="gap-2 text-base" onClick={() => navigate(affiliateLink)}>
                 Become an Affiliate
               </Button>
             </div>
@@ -262,7 +265,7 @@ const Index = () => {
               Join our affiliate program and earn 30% commission on every sale. Get your unique referral link, marketing materials, and real-time tracking.
             </p>
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <Button size="lg" className="gap-2" onClick={() => navigate("/signup?affiliate=true")}>
+              <Button size="lg" className="gap-2" onClick={() => navigate(affiliateLink)}>
                 <Users className="h-4 w-4" />
                 Become an Affiliate
               </Button>
