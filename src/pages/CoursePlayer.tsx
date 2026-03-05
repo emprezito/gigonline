@@ -9,6 +9,7 @@ import { CheckCircle, ChevronDown, Play, FileText, Bookmark, BookmarkCheck, Arro
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
+import { CertificateDownload } from "@/components/CertificateDownload";
 
 interface Module {
   id: string;
@@ -33,6 +34,7 @@ const CoursePlayer = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const [courseTitle, setCourseTitle] = useState("");
   const [modules, setModules] = useState<Module[]>([]);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
@@ -47,6 +49,14 @@ const CoursePlayer = () => {
   }, [user, authLoading, courseId]);
 
   const fetchCourseData = async () => {
+    // Fetch course title
+    const { data: courseData } = await supabase
+      .from("courses")
+      .select("title")
+      .eq("id", courseId!)
+      .single();
+    if (courseData) setCourseTitle(courseData.title);
+
     const { data: modulesData } = await supabase
       .from("modules")
       .select("*")
@@ -163,6 +173,13 @@ const CoursePlayer = () => {
           <Progress value={overallProgress} className="h-2" />
         </div>
         <span className="text-sm text-muted-foreground">{Math.round(overallProgress)}% complete</span>
+        {overallProgress === 100 && totalLessons > 0 && (
+          <CertificateDownload
+            courseTitle={courseTitle}
+            userName={user?.user_metadata?.full_name || "Student"}
+            completionDate={new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+          />
+        )}
       </div>
 
       <div className="flex flex-1 overflow-hidden">
