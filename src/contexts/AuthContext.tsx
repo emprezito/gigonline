@@ -15,6 +15,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   hasRole: (role: AppRole) => boolean;
+  becomeAffiliate: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -115,48 +116,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string, isAffiliate = false) => {
-    const signUpPayload = {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: fullName, wants_affiliate: isAffiliate },
         emailRedirectTo: window.location.origin,
       },
-    };
+    });
+    if (error) throw error;
 
-    const { data, error } = await supabase.auth.signUp(signUpPayload);
-
-    if (error) {
-      const isExistingAccount = error.message.toLowerCase().includes("already registered");
-      if (!isAffiliate || !isExistingAccount) throw error;
-
-      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
-      if (loginError || !loginData.user) throw loginError ?? error;
-
-      await ensureAffiliateProfile(loginData.user.id, fullName || String(loginData.user.user_metadata?.full_name ?? ""));
-      await fetchRoles(loginData.user.id);
-      await supabase.auth.signOut();
-      return;
-    }
-
-    if (!isAffiliate || !data.user) return;
-
-    const looksLikeExistingUser = (data.user.identities?.length ?? 0) === 0;
-
-    if (data.session) {
+    // If user already has a session (auto-confirm enabled), set up affiliate immediately
+    if (isAffiliate && data.user && data.session) {
       await ensureAffiliateProfile(data.user.id, fullName);
       await fetchRoles(data.user.id);
-      return;
     }
+  };
 
-    if (looksLikeExistingUser) {
-      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
-      if (loginError || !loginData.user) throw loginError ?? new Error("Unable to sign in to upgrade affiliate role.");
-
-      await ensureAffiliateProfile(loginData.user.id, fullName || String(loginData.user.user_metadata?.full_name ?? ""));
-      await fetchRoles(loginData.user.id);
-      await supabase.auth.signOut();
-    }
+  const becomeAffiliate = async () => {
+    if (!user) throw new Error("You must be logged in.");
+    const fullName = String(user.user_metadata?.full_name ?? "");
+    await ensureAffiliateProfile(user.id, fullName);
+    await fetchRoles(user.id);
   };
 
   const signIn = async (email: string, password: string) => {
@@ -179,7 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const hasRole = (role: AppRole) => roles.includes(role);
 
   return (
-    <AuthContext.Provider value={{ session, user, roles, loading, signUp, signIn, signOut, resetPassword, hasRole }}>
+    <AuthContext.Provider value={{ session, user, roles, loading, signUp, signIn, signOut, resetPassword, hasRole, becomeAffiliate }}>
       {children}
     </AuthContext.Provider>
   );
