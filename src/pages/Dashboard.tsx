@@ -79,12 +79,12 @@ const Dashboard = () => {
 
     setEnrolling(courseId);
     try {
-      // Get affiliate cookie
+      // Get referral code from cookie
       const getCookie = (name: string) => {
         const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
         return match ? match[2] : null;
       };
-      const affiliateId = getCookie("ref_affiliate_id") || undefined;
+      const referralCode = getCookie("referral_code") || undefined;
 
       const { data, error } = await supabase.functions.invoke("create-payment", {
         body: {
@@ -92,8 +92,8 @@ const Dashboard = () => {
           amount: course.price,
           courseId,
           userId: user.id,
-          callbackUrl: `${window.location.origin}/dashboard`,
-          affiliateId,
+          callbackUrl: `${window.location.origin}/payment/verify`,
+          referralCode,
         },
       });
 

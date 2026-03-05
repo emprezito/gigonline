@@ -1,6 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { createHmac } from "https://deno.land/std@0.168.0/crypto/mod.ts";
+
+async function verifySignature(secret: string, body: string, signature: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-512" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(body));
+  const hash = Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return hash === signature;
+}
 
 serve(async (req) => {
   if (req.method !== "POST") {
@@ -15,8 +30,7 @@ serve(async (req) => {
 
     // Verify Paystack signature
     const signature = req.headers.get("x-paystack-signature");
-    const hash = createHmac("sha512", PAYSTACK_SECRET_KEY).update(body).toString();
-    if (hash !== signature) {
+    if (!signature || !(await verifySignature(PAYSTACK_SECRET_KEY, body, signature))) {
       return new Response("Invalid signature", { status: 401 });
     }
 

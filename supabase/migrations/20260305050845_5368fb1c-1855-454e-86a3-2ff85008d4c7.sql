@@ -1,0 +1,1 @@
+DROP POLICY "Anyone can look up affiliates by referral code" ON public.affiliates;

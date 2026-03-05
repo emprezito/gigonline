@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,7 +16,7 @@ serve(async (req) => {
     const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
     if (!PAYSTACK_SECRET_KEY) throw new Error("PAYSTACK_SECRET_KEY not configured");
 
-    const { email, amount, courseId, userId, callbackUrl, affiliateId } = await req.json();
+    const { email, amount, courseId, userId, callbackUrl, referralCode } = await req.json();
 
     if (!email || !amount || !courseId || !userId) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -24,7 +25,26 @@ serve(async (req) => {
       });
     }
 
-    const metadata = { course_id: courseId, user_id: userId, affiliate_id: affiliateId || null };
+    // Look up affiliate by referral code if provided
+    let affiliateId = null;
+    if (referralCode) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      const { data: aff } = await supabase
+        .from("affiliates")
+        .select("id")
+        .eq("referral_code", referralCode)
+        .eq("enabled", true)
+        .single();
+
+      if (aff) {
+        affiliateId = aff.id;
+      }
+    }
+
+    const metadata = { course_id: courseId, user_id: userId, affiliate_id: affiliateId };
 
     const res = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",

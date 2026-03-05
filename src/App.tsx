@@ -18,6 +18,7 @@ import AffiliateDashboard from "./pages/AffiliateDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProfileSettings from "./pages/ProfileSettings";
 import NotFound from "./pages/NotFound";
+import PaymentVerify from "./pages/PaymentVerify";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/payment/verify" element={<PaymentVerify />} />
               <Route path="/course/:courseId" element={<CoursePlayer />} />
               <Route path="/affiliate" element={<AffiliateDashboard />} />
               <Route path="/admin" element={<AdminDashboard />} />
