@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ReferralTracker } from "@/components/ReferralTracker";
+import { HashScrollHandler } from "@/components/HashScrollHandler";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -28,6 +29,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <HashScrollHandler />
             <ReferralTracker />
             <Routes>
               <Route path="/" element={<Index />} />

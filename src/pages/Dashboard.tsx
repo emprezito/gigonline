@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { BookOpen, Play, CheckCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface CourseWithProgress {
   id: string;
@@ -21,6 +22,7 @@ interface CourseWithProgress {
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [courses, setCourses] = useState<CourseWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,53 +35,78 @@ const Dashboard = () => {
   }, [user, authLoading]);
 
   const fetchEnrolledCourses = async () => {
-    const { data: enrollments } = await supabase
-      .from("enrollments")
-      .select("course_id")
-      .eq("user_id", user!.id);
+    if (!user) return;
 
-    if (!enrollments?.length) {
-      setLoading(false);
-      return;
-    }
+    setLoading(true);
+    try {
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from("enrollments")
+        .select("course_id")
+        .eq("user_id", user.id);
 
-    const courseIds = enrollments.map((e) => e.course_id);
-    const { data: coursesData } = await supabase
-      .from("courses")
-      .select("*")
-      .in("id", courseIds);
-
-    const coursesWithProgress: CourseWithProgress[] = [];
-    for (const course of coursesData || []) {
-      const { data: modules } = await supabase.from("modules").select("id").eq("course_id", course.id);
-      const moduleIds = modules?.map((m) => m.id) || [];
-      
-      let totalLessons = 0;
-      let completedLessons = 0;
-      
-      if (moduleIds.length > 0) {
-        const { count: total } = await supabase.from("lessons").select("*", { count: "exact", head: true }).in("module_id", moduleIds);
-        totalLessons = total || 0;
-        
-        const { data: lessons } = await supabase.from("lessons").select("id").in("module_id", moduleIds);
-        const lessonIds = lessons?.map((l) => l.id) || [];
-        
-        if (lessonIds.length > 0) {
-          const { count: completed } = await supabase
-            .from("lesson_progress")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", user!.id)
-            .in("lesson_id", lessonIds)
-            .eq("completed", true);
-          completedLessons = completed || 0;
-        }
+      if (enrollmentsError) throw enrollmentsError;
+      if (!enrollments?.length) {
+        setCourses([]);
+        return;
       }
 
-      coursesWithProgress.push({ ...course, totalLessons, completedLessons });
-    }
+      const courseIds = enrollments.map((enrollment) => enrollment.course_id);
 
-    setCourses(coursesWithProgress);
-    setLoading(false);
+      const [{ data: coursesData, error: coursesError }, { data: modulesData, error: modulesError }] = await Promise.all([
+        supabase.from("courses").select("id, title, description, image_url").in("id", courseIds),
+        supabase.from("modules").select("id, course_id").in("course_id", courseIds),
+      ]);
+
+      if (coursesError) throw coursesError;
+      if (modulesError) throw modulesError;
+
+      const moduleIds = (modulesData ?? []).map((module) => module.id);
+      if (!moduleIds.length) {
+        setCourses((coursesData ?? []).map((course) => ({ ...course, totalLessons: 0, completedLessons: 0 })));
+        return;
+      }
+
+      const [{ data: lessonsData, error: lessonsError }, { data: progressData, error: progressError }] = await Promise.all([
+        supabase.from("lessons").select("id, module_id").in("module_id", moduleIds),
+        supabase
+          .from("lesson_progress")
+          .select("lesson_id")
+          .eq("user_id", user.id)
+          .eq("completed", true),
+      ]);
+
+      if (lessonsError) throw lessonsError;
+      if (progressError) throw progressError;
+
+      const moduleToCourse = new Map((modulesData ?? []).map((module) => [module.id, module.course_id]));
+      const completedLessonIds = new Set((progressData ?? []).map((progress) => progress.lesson_id));
+      const progressByCourse = new Map<string, { totalLessons: number; completedLessons: number }>();
+
+      for (const lesson of lessonsData ?? []) {
+        const courseId = moduleToCourse.get(lesson.module_id);
+        if (!courseId) continue;
+
+        const current = progressByCourse.get(courseId) ?? { totalLessons: 0, completedLessons: 0 };
+        current.totalLessons += 1;
+        if (completedLessonIds.has(lesson.id)) {
+          current.completedLessons += 1;
+        }
+        progressByCourse.set(courseId, current);
+      }
+
+      const coursesWithProgress: CourseWithProgress[] = (coursesData ?? []).map((course) => {
+        const progress = progressByCourse.get(course.id) ?? { totalLessons: 0, completedLessons: 0 };
+        return { ...course, ...progress };
+      });
+
+      setCourses(coursesWithProgress);
+    } catch (error) {
+      console.error("Failed to load dashboard courses:", error);
+      setCourses([]);
+      toast({ title: "Error", description: "We couldn't load your courses right now.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (authLoading || loading) {
@@ -103,7 +130,7 @@ const Dashboard = () => {
               <BookOpen className="h-12 w-12 text-muted-foreground" />
               <h3 className="mt-4 font-display text-lg font-semibold">No courses yet</h3>
               <p className="mt-2 text-sm text-muted-foreground">Enroll in a course to get started</p>
-              <Button className="mt-4" onClick={() => navigate("/")}>Browse Courses</Button>
+              <Button className="mt-4" onClick={() => navigate("/#modules")}>Browse Courses</Button>
             </CardContent>
           </Card>
         ) : (
@@ -125,7 +152,15 @@ const Dashboard = () => {
                         </span>
                         <span>{Math.round(progress)}%</span>
                       </div>
-                      <Button variant="outline" size="sm" className="w-full gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(`/course/${course.id}`);
+                        }}
+                      >
                         <Play className="h-3.5 w-3.5" />
                         Continue Learning
                       </Button>

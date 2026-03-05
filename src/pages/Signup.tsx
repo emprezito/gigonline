@@ -25,7 +25,7 @@ const Signup = () => {
     setLoading(true);
     try {
       await signUp(email, password, fullName, isAffiliate);
-      toast({ title: "Account created!", description: "Check your email to confirm your account." });
+      toast({ title: "Account created!", description: "You can log in now." });
       navigate("/login");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
