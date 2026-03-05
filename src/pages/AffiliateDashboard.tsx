@@ -7,10 +7,40 @@ import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MousePointerClick, DollarSign, TrendingUp, Copy, Share2, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MousePointerClick, DollarSign, TrendingUp, Copy, Share2, AlertCircle, CheckCircle2, XCircle, Loader2, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+const NIGERIAN_BANKS = [
+  { name: "Access Bank", code: "044" },
+  { name: "Citibank Nigeria", code: "023" },
+  { name: "Ecobank Nigeria", code: "050" },
+  { name: "Fidelity Bank", code: "070" },
+  { name: "First Bank of Nigeria", code: "011" },
+  { name: "First City Monument Bank", code: "214" },
+  { name: "Globus Bank", code: "00103" },
+  { name: "Guaranty Trust Bank", code: "058" },
+  { name: "Heritage Bank", code: "030" },
+  { name: "Keystone Bank", code: "082" },
+  { name: "Kuda Bank", code: "50211" },
+  { name: "Moniepoint MFB", code: "50515" },
+  { name: "OPay", code: "999992" },
+  { name: "PalmPay", code: "999991" },
+  { name: "Polaris Bank", code: "076" },
+  { name: "Providus Bank", code: "101" },
+  { name: "Stanbic IBTC Bank", code: "221" },
+  { name: "Standard Chartered Bank", code: "068" },
+  { name: "Sterling Bank", code: "232" },
+  { name: "Union Bank of Nigeria", code: "032" },
+  { name: "United Bank for Africa", code: "033" },
+  { name: "Unity Bank", code: "215" },
+  { name: "VFD MFB", code: "566" },
+  { name: "Wema Bank", code: "035" },
+  { name: "Zenith Bank", code: "057" },
+];
 
 const AffiliateDashboard = () => {
   const { user, hasRole, loading: authLoading } = useAuth();
@@ -23,6 +53,14 @@ const AffiliateDashboard = () => {
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [pendingPayouts, setPendingPayouts] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Bank details state
+  const [bankCode, setBankCode] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [savingBank, setSavingBank] = useState(false);
+  const [verifyingAccount, setVerifyingAccount] = useState(false);
+  const [payoutLoading, setPayoutLoading] = useState(false);
 
   useEffect(() => {
     if (!authLoading && (!user || !hasRole("affiliate"))) {
@@ -41,6 +79,9 @@ const AffiliateDashboard = () => {
 
     if (!aff) { setLoading(false); return; }
     setAffiliate(aff);
+    setBankCode(aff.bank_code || "");
+    setAccountNumber(aff.account_number || "");
+    setAccountName(aff.account_name || "");
 
     const { count } = await supabase
       .from("referral_clicks")
@@ -85,13 +126,78 @@ const AffiliateDashboard = () => {
     window.open(`https://wa.me/?text=Check%20out%20this%20ghostwriting%20course!%20${url}`, "_blank");
   };
 
+  const verifyBankAccount = async () => {
+    if (!bankCode || !accountNumber || accountNumber.length !== 10) return;
+    setVerifyingAccount(true);
+    try {
+      const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+      // Use edge function to verify since we need the secret key
+      const { data, error } = await supabase.functions.invoke("verify-bank-account", {
+        body: { bank_code: bankCode, account_number: accountNumber },
+      });
+      if (error) throw error;
+      if (data?.data?.account_name) {
+        setAccountName(data.data.account_name);
+        toast({ title: "Account verified!", description: data.data.account_name });
+      } else {
+        throw new Error("Could not verify account");
+      }
+    } catch (err: any) {
+      toast({ title: "Verification failed", description: err.message, variant: "destructive" });
+    } finally {
+      setVerifyingAccount(false);
+    }
+  };
+
+  const saveBankDetails = async () => {
+    if (!affiliate || !bankCode || !accountNumber || !accountName) return;
+    setSavingBank(true);
+    try {
+      const bankName = NIGERIAN_BANKS.find((b) => b.code === bankCode)?.name || "";
+      const { error } = await supabase
+        .from("affiliates")
+        .update({ bank_name: bankName, bank_code: bankCode, account_number: accountNumber, account_name: accountName, transfer_recipient_code: null })
+        .eq("id", affiliate.id);
+      if (error) throw error;
+      setAffiliate({ ...affiliate, bank_name: bankName, bank_code: bankCode, account_number: accountNumber, account_name: accountName, transfer_recipient_code: null });
+      toast({ title: "Bank details saved!" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingBank(false);
+    }
+  };
+
   const requestPayout = async () => {
     if (!affiliate || pendingPayouts <= 0) return;
-    await supabase.from("payouts").insert({
-      affiliate_id: affiliate.id,
-      amount: pendingPayouts,
-    });
-    toast({ title: "Payout requested", description: "Your payout request has been submitted for review." });
+    if (!affiliate.bank_code || !affiliate.account_number) {
+      toast({ title: "Add bank details first", description: "Please save your bank details before requesting a payout.", variant: "destructive" });
+      return;
+    }
+    setPayoutLoading(true);
+    try {
+      // Create payout record
+      const { data: payout, error: insertError } = await supabase
+        .from("payouts")
+        .insert({ affiliate_id: affiliate.id, amount: pendingPayouts })
+        .select()
+        .single();
+      if (insertError) throw insertError;
+
+      // Process via edge function
+      const { data, error } = await supabase.functions.invoke("process-payout", {
+        body: { payoutId: payout.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({ title: "Payout successful!", description: `₦${pendingPayouts.toLocaleString()} has been sent to your bank account.` });
+      await fetchAffiliateData();
+    } catch (err: any) {
+      toast({ title: "Payout failed", description: err.message, variant: "destructive" });
+    } finally {
+      setPayoutLoading(false);
+    }
   };
 
   if (authLoading || loading) {
@@ -105,30 +211,12 @@ const AffiliateDashboard = () => {
   const getStatusConfig = () => {
     if (!affiliate) return null;
     if (!affiliate.enabled) {
-      return {
-        icon: XCircle,
-        variant: "destructive" as const,
-        label: "Disabled",
-        message: "Your affiliate account has been disabled. Please contact support for assistance.",
-        color: "border-destructive/30 bg-destructive/5",
-      };
+      return { icon: XCircle, variant: "destructive" as const, label: "Disabled", message: "Your affiliate account has been disabled. Please contact support.", color: "border-destructive/30 bg-destructive/5" };
     }
     if (!affiliate.approved) {
-      return {
-        icon: AlertCircle,
-        variant: "secondary" as const,
-        label: "Pending Approval",
-        message: "Your affiliate account is pending approval. You can still share your referral link — commissions will be tracked and paid once approved.",
-        color: "border-primary/30 bg-accent/50",
-      };
+      return { icon: AlertCircle, variant: "secondary" as const, label: "Pending Approval", message: "Your affiliate account is pending approval. Commissions will be tracked and paid once approved.", color: "border-primary/30 bg-accent/50" };
     }
-    return {
-      icon: CheckCircle2,
-      variant: "default" as const,
-      label: "Active",
-      message: "Your affiliate account is active. Share your referral link and start earning commissions!",
-      color: "border-green-500/30 bg-green-500/5",
-    };
+    return { icon: CheckCircle2, variant: "default" as const, label: "Active", message: "Your affiliate account is active. Share your referral link and start earning!", color: "border-green-500/30 bg-green-500/5" };
   };
 
   const status = getStatusConfig();
@@ -207,12 +295,68 @@ const AffiliateDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Bank Details */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="font-display text-lg flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Bank Account Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">Add your bank details to receive payouts directly to your account.</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label>Bank</Label>
+                <Select value={bankCode} onValueChange={setBankCode}>
+                  <SelectTrigger><SelectValue placeholder="Select your bank" /></SelectTrigger>
+                  <SelectContent>
+                    {NIGERIAN_BANKS.map((bank) => (
+                      <SelectItem key={bank.code} value={bank.code}>{bank.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Account Number</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                    placeholder="0123456789"
+                    maxLength={10}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={verifyBankAccount}
+                    disabled={verifyingAccount || !bankCode || accountNumber.length !== 10}
+                    className="shrink-0"
+                  >
+                    {verifyingAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            {accountName && (
+              <div>
+                <Label>Account Name</Label>
+                <Input value={accountName} readOnly className="bg-muted" />
+              </div>
+            )}
+            <Button onClick={saveBankDetails} disabled={savingBank || !bankCode || !accountNumber || !accountName} className="gap-2">
+              {savingBank && <Loader2 className="h-4 w-4 animate-spin" />}
+              Save Bank Details
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* Payout */}
         {pendingPayouts > 0 && (
           <div className="mt-4">
-            <Button onClick={requestPayout} className="gap-2">
-              <DollarSign className="h-4 w-4" />
-              Request Payout (₦{pendingPayouts.toLocaleString()})
+            <Button onClick={requestPayout} disabled={payoutLoading} className="gap-2">
+              {payoutLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <DollarSign className="h-4 w-4" />}
+              Withdraw ₦{pendingPayouts.toLocaleString()}
             </Button>
           </div>
         )}
