@@ -265,25 +265,34 @@ export type Database = {
         Row: {
           affiliate_id: string
           amount: number
+          approved_at: string | null
+          completed_at: string | null
           created_at: string
           id: string
           status: string
+          transfer_reference: string | null
           updated_at: string
         }
         Insert: {
           affiliate_id: string
           amount: number
+          approved_at?: string | null
+          completed_at?: string | null
           created_at?: string
           id?: string
           status?: string
+          transfer_reference?: string | null
           updated_at?: string
         }
         Update: {
           affiliate_id?: string
           amount?: number
+          approved_at?: string | null
+          completed_at?: string | null
           created_at?: string
           id?: string
           status?: string
+          transfer_reference?: string | null
           updated_at?: string
         }
         Relationships: [

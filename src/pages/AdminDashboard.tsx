@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Plus, Pencil, Trash2, DollarSign, Users, BookOpen, TrendingUp, ArrowUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, DollarSign, Users, BookOpen, TrendingUp, ArrowUpDown, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const AdminDashboard = () => {
@@ -29,9 +29,10 @@ const AdminDashboard = () => {
   const [sales, setSales] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processingPayoutId, setProcessingPayoutId] = useState<string | null>(null);
 
   // Form states
-  const [courseForm, setCourseForm] = useState({ title: "", description: "", price: 49999, commission_rate: 30, published: false });
+  const [courseForm, setCourseForm] = useState({ title: "", description: "", price: 49999, commission_rate: 50, published: false });
   const [moduleForm, setModuleForm] = useState({ course_id: "", title: "", sort_order: 0 });
   const [lessonForm, setLessonForm] = useState({ module_id: "", title: "", type: "video", video_url: "", description: "", sort_order: 0 });
   const [editingCourse, setEditingCourse] = useState<string | null>(null);
@@ -50,10 +51,9 @@ const AdminDashboard = () => {
       supabase.from("courses").select("*").order("created_at", { ascending: false }),
       supabase.from("affiliates").select("*"),
       supabase.from("sales").select("*").order("created_at", { ascending: false }),
-      supabase.from("payouts").select("*, affiliates(referral_code)").order("created_at", { ascending: false }),
+      supabase.from("payouts").select("*, affiliates(referral_code, account_name, bank_name, account_number)").order("created_at", { ascending: false }),
     ]);
 
-    // Fetch profile names for affiliates
     const affData = affiliatesRes.data || [];
     if (affData.length > 0) {
       const userIds = affData.map((a: any) => a.user_id);
@@ -62,10 +62,19 @@ const AdminDashboard = () => {
       affData.forEach((a: any) => { a.profile_name = profileMap[a.user_id] || "—"; });
     }
 
+    // Enrich payouts with affiliate profile names
+    const payoutsData = payoutsRes.data || [];
+    if (payoutsData.length > 0 && affData.length > 0) {
+      const affMap = Object.fromEntries(affData.map((a: any) => [a.id, a.profile_name]));
+      payoutsData.forEach((p: any) => {
+        p.affiliate_name = affMap[p.affiliate_id] || (p as any).affiliates?.referral_code || "—";
+      });
+    }
+
     setCourses(coursesRes.data || []);
     setAffiliates(affData);
     setSales(salesRes.data || []);
-    setPayouts(payoutsRes.data || []);
+    setPayouts(payoutsData);
     setLoading(false);
   };
 
@@ -81,7 +90,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Course CRUD
   const saveCourse = async () => {
     if (editingCourse) {
       await supabase.from("courses").update(courseForm).eq("id", editingCourse);
@@ -90,7 +98,7 @@ const AdminDashboard = () => {
     }
     setDialogOpen(null);
     setEditingCourse(null);
-    setCourseForm({ title: "", description: "", price: 49999, commission_rate: 30, published: false });
+    setCourseForm({ title: "", description: "", price: 49999, commission_rate: 50, published: false });
     fetchAllData();
     toast({ title: editingCourse ? "Course updated" : "Course created" });
   };
@@ -101,7 +109,6 @@ const AdminDashboard = () => {
     toast({ title: "Course deleted" });
   };
 
-  // Module CRUD
   const saveModule = async () => {
     await supabase.from("modules").insert(moduleForm);
     setDialogOpen(null);
@@ -110,7 +117,6 @@ const AdminDashboard = () => {
     toast({ title: "Module created" });
   };
 
-  // Lesson CRUD
   const saveLesson = async () => {
     await supabase.from("lessons").insert(lessonForm);
     setDialogOpen(null);
@@ -119,34 +125,46 @@ const AdminDashboard = () => {
     toast({ title: "Lesson created" });
   };
 
-  // Affiliate management
   const toggleAffiliate = async (id: string, field: string, value: boolean) => {
     await supabase.from("affiliates").update({ [field]: value }).eq("id", id);
     fetchAllData();
     toast({ title: "Affiliate updated" });
   };
 
-  // Payout management
-  const updatePayoutStatus = async (id: string, status: string) => {
-    await supabase.from("payouts").update({ status }).eq("id", id);
-    fetchAllData();
-    toast({ title: `Payout ${status}` });
+  const approvePayout = async (payoutId: string) => {
+    setProcessingPayoutId(payoutId);
+    try {
+      const { data, error } = await supabase.functions.invoke("process-payout", {
+        body: { payoutId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Payout approved & processed!", description: data?.message || "Transfer initiated." });
+      fetchAllData();
+    } catch (err: any) {
+      toast({ title: "Payout failed", description: err.message, variant: "destructive" });
+    } finally {
+      setProcessingPayoutId(null);
+    }
   };
 
-  // Analytics data
+  const rejectPayout = async (payoutId: string) => {
+    await supabase.from("payouts").update({ status: "failed" }).eq("id", payoutId);
+    fetchAllData();
+    toast({ title: "Payout rejected" });
+  };
+
   const salesByDay = sales.reduce((acc: any[], sale) => {
     const date = new Date(sale.created_at).toLocaleDateString();
     const existing = acc.find((d) => d.date === date);
-    if (existing) {
-      existing.amount += sale.amount;
-      existing.count += 1;
-    } else {
-      acc.push({ date, amount: sale.amount, count: 1 });
-    }
+    if (existing) { existing.amount += sale.amount; existing.count += 1; }
+    else { acc.push({ date, amount: sale.amount, count: 1 }); }
     return acc;
   }, []).slice(-14);
 
   const totalRevenue = sales.filter((s) => s.status === "completed").reduce((sum, s) => sum + s.amount, 0);
+  const pendingPayoutsCount = payouts.filter((p) => p.status === "pending").length;
+  const completedPayoutsTotal = payouts.filter((p) => p.status === "completed").reduce((sum, p) => sum + p.amount, 0);
 
   if (authLoading || loading) {
     return (
@@ -168,7 +186,14 @@ const AdminDashboard = () => {
             <TabsTrigger value="courses">Courses</TabsTrigger>
             <TabsTrigger value="affiliates">Affiliates</TabsTrigger>
             <TabsTrigger value="sales">Sales</TabsTrigger>
-            <TabsTrigger value="payouts">Payouts</TabsTrigger>
+            <TabsTrigger value="payouts" className="relative">
+              Payouts
+              {pendingPayoutsCount > 0 && (
+                <span className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">
+                  {pendingPayoutsCount}
+                </span>
+              )}
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview */}
@@ -178,7 +203,7 @@ const AdminDashboard = () => {
                 { label: "Total Revenue", value: `₦${totalRevenue.toLocaleString()}`, icon: DollarSign },
                 { label: "Total Sales", value: sales.length, icon: TrendingUp },
                 { label: "Affiliates", value: affiliates.length, icon: Users },
-                { label: "Courses", value: courses.length, icon: BookOpen },
+                { label: "Total Payouts", value: `₦${completedPayoutsTotal.toLocaleString()}`, icon: DollarSign },
               ].map((stat, i) => (
                 <Card key={i}>
                   <CardContent className="flex items-center gap-4 p-6">
@@ -195,9 +220,7 @@ const AdminDashboard = () => {
             </div>
 
             <Card>
-              <CardHeader>
-                <CardTitle className="font-display">Sales Over Time</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="font-display">Sales Over Time</CardTitle></CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={salesByDay}>
@@ -216,7 +239,7 @@ const AdminDashboard = () => {
           <TabsContent value="courses" className="space-y-6">
             <div className="flex justify-between">
               <h2 className="font-display text-xl font-bold">Course Management</h2>
-              <Dialog open={dialogOpen === "course"} onOpenChange={(open) => { setDialogOpen(open ? "course" : null); if (!open) { setEditingCourse(null); setCourseForm({ title: "", description: "", price: 49999, commission_rate: 30, published: false }); } }}>
+              <Dialog open={dialogOpen === "course"} onOpenChange={(open) => { setDialogOpen(open ? "course" : null); if (!open) { setEditingCourse(null); setCourseForm({ title: "", description: "", price: 49999, commission_rate: 50, published: false }); } }}>
                 <DialogTrigger asChild>
                   <Button className="gap-2"><Plus className="h-4 w-4" /> New Course</Button>
                 </DialogTrigger>
@@ -250,49 +273,26 @@ const AdminDashboard = () => {
                       <p className="text-sm text-muted-foreground">₦{course.price.toLocaleString()} · {course.commission_rate}% commission</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant={course.published ? "default" : "secondary"}>
-                        {course.published ? "Published" : "Draft"}
-                      </Badge>
-                      <Button variant="outline" size="sm" onClick={() => {
-                        setCourseForm(course);
-                        setEditingCourse(course.id);
-                        fetchModulesForCourse(course.id);
-                        setDialogOpen("course");
-                      }}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => {
-                        setEditingCourse(course.id);
-                        fetchModulesForCourse(course.id);
-                        setDialogOpen("manage-course");
-                      }}>
-                        <ArrowUpDown className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => deleteCourse(course.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <Badge variant={course.published ? "default" : "secondary"}>{course.published ? "Published" : "Draft"}</Badge>
+                      <Button variant="outline" size="sm" onClick={() => { setCourseForm(course); setEditingCourse(course.id); fetchModulesForCourse(course.id); setDialogOpen("course"); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="outline" size="sm" onClick={() => { setEditingCourse(course.id); fetchModulesForCourse(course.id); setDialogOpen("manage-course"); }}><ArrowUpDown className="h-3.5 w-3.5" /></Button>
+                      <Button variant="destructive" size="sm" onClick={() => deleteCourse(course.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
 
-            {/* Manage Modules & Lessons Dialog */}
             <Dialog open={dialogOpen === "manage-course"} onOpenChange={(open) => setDialogOpen(open ? "manage-course" : null)}>
               <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="font-display">Manage Modules & Lessons</DialogTitle>
-                </DialogHeader>
+                <DialogHeader><DialogTitle className="font-display">Manage Modules & Lessons</DialogTitle></DialogHeader>
                 <div className="space-y-6">
-                  {/* Add Module */}
                   <div className="space-y-2 rounded-lg border p-4">
                     <h4 className="font-display font-semibold">Add Module</h4>
                     <Input placeholder="Module title" value={moduleForm.title} onChange={(e) => setModuleForm({ ...moduleForm, course_id: editingCourse || "", title: e.target.value })} />
                     <Input type="number" placeholder="Sort order" value={moduleForm.sort_order} onChange={(e) => setModuleForm({ ...moduleForm, sort_order: Number(e.target.value) })} />
                     <Button size="sm" onClick={saveModule}>Add Module</Button>
                   </div>
-
-                  {/* Modules List */}
                   {modules.map((mod) => (
                     <div key={mod.id} className="rounded-lg border p-4">
                       <h4 className="font-display font-semibold">{mod.title}</h4>
@@ -304,7 +304,6 @@ const AdminDashboard = () => {
                           </div>
                         ))}
                       </div>
-                      {/* Add Lesson */}
                       <div className="mt-3 space-y-2 border-t pt-3">
                         <Input placeholder="Lesson title" onChange={(e) => setLessonForm({ ...lessonForm, module_id: mod.id, title: e.target.value })} />
                         <Input placeholder="Video URL" onChange={(e) => setLessonForm({ ...lessonForm, video_url: e.target.value })} />
@@ -321,15 +320,14 @@ const AdminDashboard = () => {
           {/* Affiliates */}
           <TabsContent value="affiliates">
             <Card>
-              <CardHeader>
-                <CardTitle className="font-display">Affiliate Management</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="font-display">Affiliate Management</CardTitle></CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Referral Code</TableHead>
+                      <TableHead>Bank</TableHead>
                       <TableHead>Approved</TableHead>
                       <TableHead>Enabled</TableHead>
                     </TableRow>
@@ -339,12 +337,9 @@ const AdminDashboard = () => {
                       <TableRow key={aff.id}>
                         <TableCell>{aff.profile_name || "—"}</TableCell>
                         <TableCell className="font-mono text-sm">{aff.referral_code}</TableCell>
-                        <TableCell>
-                          <Switch checked={aff.approved} onCheckedChange={(v) => toggleAffiliate(aff.id, "approved", v)} />
-                        </TableCell>
-                        <TableCell>
-                          <Switch checked={aff.enabled} onCheckedChange={(v) => toggleAffiliate(aff.id, "enabled", v)} />
-                        </TableCell>
+                        <TableCell className="text-sm">{aff.bank_name ? `${aff.bank_name} - ${aff.account_number}` : "Not set"}</TableCell>
+                        <TableCell><Switch checked={aff.approved} onCheckedChange={(v) => toggleAffiliate(aff.id, "approved", v)} /></TableCell>
+                        <TableCell><Switch checked={aff.enabled} onCheckedChange={(v) => toggleAffiliate(aff.id, "enabled", v)} /></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -356,15 +351,14 @@ const AdminDashboard = () => {
           {/* Sales */}
           <TabsContent value="sales">
             <Card>
-              <CardHeader>
-                <CardTitle className="font-display">Sales History</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="font-display">Sales History</CardTitle></CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Amount</TableHead>
+                      <TableHead>Commission</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Payment Ref</TableHead>
                     </TableRow>
@@ -374,6 +368,7 @@ const AdminDashboard = () => {
                       <TableRow key={sale.id}>
                         <TableCell>{new Date(sale.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>₦{sale.amount.toLocaleString()}</TableCell>
+                        <TableCell>₦{(sale.commission_amount || 0).toLocaleString()}</TableCell>
                         <TableCell><Badge variant={sale.status === "completed" ? "default" : "secondary"}>{sale.status}</Badge></TableCell>
                         <TableCell className="font-mono text-xs">{sale.payment_ref || "—"}</TableCell>
                       </TableRow>
@@ -385,40 +380,92 @@ const AdminDashboard = () => {
           </TabsContent>
 
           {/* Payouts */}
-          <TabsContent value="payouts">
+          <TabsContent value="payouts" className="space-y-6">
+            {/* Payout Stats */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardContent className="p-6">
+                  <p className="text-sm text-muted-foreground">Pending Requests</p>
+                  <p className="font-display text-2xl font-bold">{pendingPayoutsCount}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <p className="text-sm text-muted-foreground">Total Paid Out</p>
+                  <p className="font-display text-2xl font-bold">₦{completedPayoutsTotal.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <p className="text-sm text-muted-foreground">Total Requests</p>
+                  <p className="font-display text-2xl font-bold">{payouts.length}</p>
+                </CardContent>
+              </Card>
+            </div>
+
             <Card>
-              <CardHeader>
-                <CardTitle className="font-display">Payout Requests</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="font-display">Payout Requests</CardTitle></CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Affiliate</TableHead>
                       <TableHead>Amount</TableHead>
+                      <TableHead>Bank Account</TableHead>
+                      <TableHead>Date</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {payouts.map((payout) => (
-                      <TableRow key={payout.id}>
-                        <TableCell>{(payout as any).affiliates?.profiles?.full_name || (payout as any).affiliates?.referral_code || "—"}</TableCell>
-                        <TableCell>₦{payout.amount.toLocaleString()}</TableCell>
-                        <TableCell><Badge variant={payout.status === "paid" ? "default" : payout.status === "approved" ? "secondary" : "outline"}>{payout.status}</Badge></TableCell>
-                        <TableCell>
-                          {payout.status === "pending" && (
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="outline" onClick={() => updatePayoutStatus(payout.id, "approved")}>Approve</Button>
-                              <Button size="sm" onClick={() => updatePayoutStatus(payout.id, "paid")}>Mark Paid</Button>
-                            </div>
-                          )}
-                          {payout.status === "approved" && (
-                            <Button size="sm" onClick={() => updatePayoutStatus(payout.id, "paid")}>Mark Paid</Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {payouts.map((payout) => {
+                      const affInfo = (payout as any).affiliates;
+                      return (
+                        <TableRow key={payout.id}>
+                          <TableCell>{(payout as any).affiliate_name || "—"}</TableCell>
+                          <TableCell>₦{payout.amount.toLocaleString()}</TableCell>
+                          <TableCell className="text-sm">
+                            {affInfo?.bank_name ? `${affInfo.bank_name} - ${affInfo.account_number} (${affInfo.account_name})` : "No bank details"}
+                          </TableCell>
+                          <TableCell>{new Date(payout.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <Badge variant={
+                              payout.status === "completed" ? "default" :
+                              payout.status === "processing" ? "secondary" :
+                              payout.status === "failed" ? "destructive" : "outline"
+                            }>
+                              {payout.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {payout.status === "pending" && (
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => approvePayout(payout.id)}
+                                  disabled={processingPayoutId === payout.id}
+                                  className="gap-1"
+                                >
+                                  {processingPayoutId === payout.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                  )}
+                                  Approve & Pay
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={() => rejectPayout(payout.id)} className="gap-1">
+                                  <XCircle className="h-3.5 w-3.5" />
+                                  Reject
+                                </Button>
+                              </div>
+                            )}
+                            {payout.status === "completed" && payout.transfer_reference && (
+                              <span className="font-mono text-xs text-muted-foreground">{payout.transfer_reference}</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
