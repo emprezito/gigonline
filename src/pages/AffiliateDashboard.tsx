@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MousePointerClick, DollarSign, TrendingUp, Copy, Share2, AlertCircle, CheckCircle2, XCircle, Loader2, Building2 } from "lucide-react";
+import { MousePointerClick, DollarSign, TrendingUp, Copy, Share2, AlertCircle, CheckCircle2, XCircle, Loader2, Building2, Wallet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const NIGERIAN_BANKS = [
@@ -42,6 +42,8 @@ const NIGERIAN_BANKS = [
   { name: "Zenith Bank", code: "057" },
 ];
 
+const MIN_WITHDRAWAL = 20000;
+
 const AffiliateDashboard = () => {
   const { user, hasRole, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -51,7 +53,8 @@ const AffiliateDashboard = () => {
   const [clicks, setClicks] = useState(0);
   const [sales, setSales] = useState<any[]>([]);
   const [totalEarnings, setTotalEarnings] = useState(0);
-  const [pendingPayouts, setPendingPayouts] = useState(0);
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [payoutHistory, setPayoutHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Bank details state
@@ -99,13 +102,20 @@ const AffiliateDashboard = () => {
     const earnings = salesData?.reduce((sum, s) => sum + (s.commission_amount || 0), 0) || 0;
     setTotalEarnings(earnings);
 
-    const { data: payouts } = await supabase
+    // Get all payouts (not just paid) to calculate available balance
+    const { data: allPayouts } = await supabase
       .from("payouts")
-      .select("amount")
+      .select("*")
       .eq("affiliate_id", aff.id)
-      .eq("status", "paid");
-    const paidAmount = payouts?.reduce((sum, p) => sum + p.amount, 0) || 0;
-    setPendingPayouts(earnings - paidAmount);
+      .order("created_at", { ascending: false });
+    
+    setPayoutHistory(allPayouts || []);
+
+    // Deduct completed + pending + processing payouts from available balance
+    const deductedAmount = (allPayouts || [])
+      .filter((p) => p.status !== "failed")
+      .reduce((sum, p) => sum + p.amount, 0);
+    setAvailableBalance(Math.max(0, earnings - deductedAmount));
 
     setLoading(false);
   };
@@ -130,8 +140,6 @@ const AffiliateDashboard = () => {
     if (!bankCode || !accountNumber || accountNumber.length !== 10) return;
     setVerifyingAccount(true);
     try {
-      const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
-      // Use edge function to verify since we need the secret key
       const { data, error } = await supabase.functions.invoke("verify-bank-account", {
         body: { bank_code: bankCode, account_number: accountNumber },
       });
@@ -169,32 +177,30 @@ const AffiliateDashboard = () => {
   };
 
   const requestPayout = async () => {
-    if (!affiliate || pendingPayouts <= 0) return;
+    if (!affiliate || availableBalance < MIN_WITHDRAWAL) return;
     if (!affiliate.bank_code || !affiliate.account_number) {
       toast({ title: "Add bank details first", description: "Please save your bank details before requesting a payout.", variant: "destructive" });
       return;
     }
+
+    // Check for existing pending/processing payouts
+    const hasPending = payoutHistory.some((p) => p.status === "pending" || p.status === "processing");
+    if (hasPending) {
+      toast({ title: "Existing request pending", description: "You already have a pending withdrawal request.", variant: "destructive" });
+      return;
+    }
+
     setPayoutLoading(true);
     try {
-      // Create payout record
-      const { data: payout, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from("payouts")
-        .insert({ affiliate_id: affiliate.id, amount: pendingPayouts })
-        .select()
-        .single();
+        .insert({ affiliate_id: affiliate.id, amount: availableBalance, status: "pending" });
       if (insertError) throw insertError;
 
-      // Process via edge function
-      const { data, error } = await supabase.functions.invoke("process-payout", {
-        body: { payoutId: payout.id },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      toast({ title: "Payout successful!", description: `₦${pendingPayouts.toLocaleString()} has been sent to your bank account.` });
+      toast({ title: "Withdrawal requested!", description: `₦${availableBalance.toLocaleString()} payout request submitted. Awaiting admin approval.` });
       await fetchAffiliateData();
     } catch (err: any) {
-      toast({ title: "Payout failed", description: err.message, variant: "destructive" });
+      toast({ title: "Request failed", description: err.message, variant: "destructive" });
     } finally {
       setPayoutLoading(false);
     }
@@ -220,13 +226,24 @@ const AffiliateDashboard = () => {
   };
 
   const status = getStatusConfig();
+  const canWithdraw = availableBalance >= MIN_WITHDRAWAL && !payoutHistory.some((p) => p.status === "pending" || p.status === "processing");
+
+  const getPayoutStatusBadge = (s: string) => {
+    switch (s) {
+      case "completed": return <Badge className="bg-green-500/10 text-green-600 border-green-500/30">Completed</Badge>;
+      case "processing": return <Badge variant="secondary">Processing</Badge>;
+      case "pending": return <Badge variant="outline">Pending</Badge>;
+      case "failed": return <Badge variant="destructive">Failed</Badge>;
+      default: return <Badge variant="outline">{s}</Badge>;
+    }
+  };
 
   return (
     <div className="min-h-screen">
       <Navbar />
       <div className="container mx-auto px-4 py-10">
         <h1 className="font-display text-3xl font-bold">Affiliate Dashboard</h1>
-        <p className="mt-2 text-muted-foreground">Track your referrals and earnings</p>
+        <p className="mt-2 text-muted-foreground">Track your referrals and earnings (50% commission)</p>
 
         {/* Status Banner */}
         {status && (
@@ -245,12 +262,12 @@ const AffiliateDashboard = () => {
         )}
 
         {/* Stats */}
-        <div className="mt-8 grid gap-4 md:grid-cols-4">
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { label: "Total Clicks", value: clicks, icon: MousePointerClick },
             { label: "Total Sales", value: sales.length, icon: TrendingUp },
             { label: "Total Earnings", value: `₦${totalEarnings.toLocaleString()}`, icon: DollarSign },
-            { label: "Pending Payout", value: `₦${pendingPayouts.toLocaleString()}`, icon: DollarSign },
+            { label: "Available to Withdraw", value: `₦${availableBalance.toLocaleString()}`, icon: Wallet },
           ].map((stat, i) => (
             <Card key={i}>
               <CardContent className="flex items-center gap-4 p-6">
@@ -265,6 +282,41 @@ const AffiliateDashboard = () => {
             </Card>
           ))}
         </div>
+
+        {/* Withdrawal Section */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="font-display text-lg flex items-center gap-2">
+              <Wallet className="h-5 w-5" />
+              Withdraw Earnings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg bg-muted p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Available to Withdraw</p>
+                <p className="font-display text-3xl font-bold">₦{availableBalance.toLocaleString()}</p>
+              </div>
+              <Button
+                onClick={requestPayout}
+                disabled={!canWithdraw || payoutLoading}
+                className="gap-2"
+                size="lg"
+              >
+                {payoutLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <DollarSign className="h-4 w-4" />}
+                Request Withdrawal
+              </Button>
+            </div>
+            {availableBalance < MIN_WITHDRAWAL && (
+              <p className="text-sm text-muted-foreground">
+                Minimum withdrawal amount is ₦{MIN_WITHDRAWAL.toLocaleString()}. You need ₦{(MIN_WITHDRAWAL - availableBalance).toLocaleString()} more.
+              </p>
+            )}
+            {payoutHistory.some((p) => p.status === "pending" || p.status === "processing") && (
+              <p className="text-sm text-amber-600">You have a pending withdrawal request being processed.</p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Referral Link */}
         <Card className="mt-8">
@@ -285,12 +337,6 @@ const AffiliateDashboard = () => {
               <Button variant="outline" size="sm" onClick={shareOnWhatsApp} className="gap-2">
                 <Share2 className="h-4 w-4" /> WhatsApp
               </Button>
-            </div>
-            <div className="rounded-lg bg-muted p-4">
-              <p className="text-sm font-medium">Marketing Copy</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                "Want to build a 6-figure ghostwriting career? This course taught me everything I needed to know. Enroll now and transform your writing into a business!"
-              </p>
             </div>
           </CardContent>
         </Card>
@@ -351,15 +397,38 @@ const AffiliateDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Payout */}
-        {pendingPayouts > 0 && (
-          <div className="mt-4">
-            <Button onClick={requestPayout} disabled={payoutLoading} className="gap-2">
-              {payoutLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <DollarSign className="h-4 w-4" />}
-              Withdraw ₦{pendingPayouts.toLocaleString()}
-            </Button>
-          </div>
-        )}
+        {/* Withdrawal History */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="font-display text-lg">Withdrawal History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {payoutHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No withdrawal requests yet.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Reference</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {payoutHistory.map((payout) => (
+                    <TableRow key={payout.id}>
+                      <TableCell>{new Date(payout.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>₦{payout.amount.toLocaleString()}</TableCell>
+                      <TableCell>{getPayoutStatusBadge(payout.status)}</TableCell>
+                      <TableCell className="font-mono text-xs">{payout.transfer_reference || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Sales History */}
         <Card className="mt-8">
@@ -375,7 +444,7 @@ const AffiliateDashboard = () => {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Amount</TableHead>
-                    <TableHead>Commission</TableHead>
+                    <TableHead>Commission (50%)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

@@ -5,11 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { CheckCircle, ChevronDown, Play, FileText, Bookmark, BookmarkCheck, ArrowLeft, Search } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { CheckCircle, ChevronDown, Play, FileText, Bookmark, BookmarkCheck, ArrowLeft, Search, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { CertificateDownload } from "@/components/CertificateDownload";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Module {
   id: string;
@@ -28,11 +30,67 @@ interface Lesson {
   sort_order: number;
 }
 
+const SidebarContent = ({
+  searchQuery,
+  setSearchQuery,
+  filteredModules,
+  activeLesson,
+  completedLessons,
+  onSelectLesson,
+}: {
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
+  filteredModules: Module[];
+  activeLesson: Lesson | null;
+  completedLessons: Set<string>;
+  onSelectLesson: (lesson: Lesson) => void;
+}) => (
+  <>
+    <div className="p-3">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input placeholder="Search lessons..." className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+      </div>
+    </div>
+    <ScrollArea className="h-[calc(100vh-8rem)]">
+      {filteredModules.map((mod) => (
+        <Collapsible key={mod.id} defaultOpen>
+          <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold hover:bg-accent/50">
+            {mod.title}
+            <ChevronDown className="h-4 w-4" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            {mod.lessons.map((lesson) => (
+              <button
+                key={lesson.id}
+                onClick={() => onSelectLesson(lesson)}
+                className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent/50 ${
+                  activeLesson?.id === lesson.id ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                }`}
+              >
+                {completedLessons.has(lesson.id) ? (
+                  <CheckCircle className="h-4 w-4 shrink-0 text-primary" />
+                ) : lesson.type === "video" ? (
+                  <Play className="h-4 w-4 shrink-0" />
+                ) : (
+                  <FileText className="h-4 w-4 shrink-0" />
+                )}
+                <span className="truncate">{lesson.title}</span>
+              </button>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      ))}
+    </ScrollArea>
+  </>
+);
+
 const CoursePlayer = () => {
   const { courseId } = useParams();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const [courseTitle, setCourseTitle] = useState("");
   const [modules, setModules] = useState<Module[]>([]);
@@ -40,8 +98,8 @@ const CoursePlayer = () => {
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
   const [bookmarkedLessons, setBookmarkedLessons] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) { navigate("/login"); return; }
@@ -49,27 +107,14 @@ const CoursePlayer = () => {
   }, [user, authLoading, courseId]);
 
   const fetchCourseData = async () => {
-    // Fetch course title
-    const { data: courseData } = await supabase
-      .from("courses")
-      .select("title")
-      .eq("id", courseId!)
-      .single();
+    const { data: courseData } = await supabase.from("courses").select("title").eq("id", courseId!).single();
     if (courseData) setCourseTitle(courseData.title);
 
-    const { data: modulesData } = await supabase
-      .from("modules")
-      .select("*")
-      .eq("course_id", courseId!)
-      .order("sort_order");
+    const { data: modulesData } = await supabase.from("modules").select("*").eq("course_id", courseId!).order("sort_order");
 
     const modulesWithLessons: Module[] = [];
     for (const mod of modulesData || []) {
-      const { data: lessons } = await supabase
-        .from("lessons")
-        .select("*")
-        .eq("module_id", mod.id)
-        .order("sort_order");
+      const { data: lessons } = await supabase.from("lessons").select("*").eq("module_id", mod.id).order("sort_order");
       modulesWithLessons.push({ ...mod, lessons: lessons || [] });
     }
 
@@ -78,22 +123,12 @@ const CoursePlayer = () => {
       setActiveLesson(modulesWithLessons[0].lessons[0]);
     }
 
-    // Fetch progress
     const allLessonIds = modulesWithLessons.flatMap((m) => m.lessons.map((l) => l.id));
     if (allLessonIds.length > 0) {
-      const { data: progress } = await supabase
-        .from("lesson_progress")
-        .select("lesson_id")
-        .eq("user_id", user!.id)
-        .in("lesson_id", allLessonIds)
-        .eq("completed", true);
+      const { data: progress } = await supabase.from("lesson_progress").select("lesson_id").eq("user_id", user!.id).in("lesson_id", allLessonIds).eq("completed", true);
       setCompletedLessons(new Set(progress?.map((p) => p.lesson_id) || []));
 
-      const { data: bookmarks } = await supabase
-        .from("bookmarks")
-        .select("lesson_id")
-        .eq("user_id", user!.id)
-        .in("lesson_id", allLessonIds);
+      const { data: bookmarks } = await supabase.from("bookmarks").select("lesson_id").eq("user_id", user!.id).in("lesson_id", allLessonIds);
       setBookmarkedLessons(new Set(bookmarks?.map((b) => b.lesson_id) || []));
     }
 
@@ -106,12 +141,7 @@ const CoursePlayer = () => {
       await supabase.from("lesson_progress").delete().eq("user_id", user!.id).eq("lesson_id", lessonId);
       setCompletedLessons((prev) => { const s = new Set(prev); s.delete(lessonId); return s; });
     } else {
-      await supabase.from("lesson_progress").upsert({
-        user_id: user!.id,
-        lesson_id: lessonId,
-        completed: true,
-        completed_at: new Date().toISOString(),
-      });
+      await supabase.from("lesson_progress").upsert({ user_id: user!.id, lesson_id: lessonId, completed: true, completed_at: new Date().toISOString() });
       setCompletedLessons((prev) => new Set(prev).add(lessonId));
       toast({ title: "Lesson completed! 🎉" });
     }
@@ -154,6 +184,11 @@ const CoursePlayer = () => {
     lessons: m.lessons.filter((l) => l.title.toLowerCase().includes(searchQuery.toLowerCase())),
   })).filter((m) => m.lessons.length > 0);
 
+  const handleSelectLesson = (lesson: Lesson) => {
+    setActiveLesson(lesson);
+    setMobileSheetOpen(false);
+  };
+
   if (authLoading || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -165,14 +200,33 @@ const CoursePlayer = () => {
   return (
     <div className="flex h-screen flex-col">
       {/* Top bar */}
-      <div className="flex h-14 items-center gap-4 border-b bg-background px-4">
+      <div className="flex h-14 items-center gap-2 border-b bg-background px-4">
+        {isMobile && (
+          <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="h-4 w-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[280px] p-0">
+              <SidebarContent
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                filteredModules={filteredModules}
+                activeLesson={activeLesson}
+                completedLessons={completedLessons}
+                onSelectLesson={handleSelectLesson}
+              />
+            </SheetContent>
+          </Sheet>
+        )}
         <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
           <Progress value={overallProgress} className="h-2" />
         </div>
-        <span className="text-sm text-muted-foreground">{Math.round(overallProgress)}% complete</span>
+        <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">{Math.round(overallProgress)}%</span>
         {overallProgress === 100 && totalLessons > 0 && (
           <CertificateDownload
             courseTitle={courseTitle}
@@ -183,52 +237,24 @@ const CoursePlayer = () => {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        {sidebarOpen && (
-          <div className="w-80 shrink-0 border-r bg-muted/30">
-            <div className="p-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search lessons..." className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-              </div>
-            </div>
-            <ScrollArea className="h-[calc(100vh-8rem)]">
-              {filteredModules.map((mod) => (
-                <Collapsible key={mod.id} defaultOpen>
-                  <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold hover:bg-accent/50">
-                    {mod.title}
-                    <ChevronDown className="h-4 w-4" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    {mod.lessons.map((lesson) => (
-                      <button
-                        key={lesson.id}
-                        onClick={() => setActiveLesson(lesson)}
-                        className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent/50 ${
-                          activeLesson?.id === lesson.id ? "bg-accent text-accent-foreground" : "text-muted-foreground"
-                        }`}
-                      >
-                        {completedLessons.has(lesson.id) ? (
-                          <CheckCircle className="h-4 w-4 shrink-0 text-primary" />
-                        ) : lesson.type === "video" ? (
-                          <Play className="h-4 w-4 shrink-0" />
-                        ) : (
-                          <FileText className="h-4 w-4 shrink-0" />
-                        )}
-                        <span className="truncate">{lesson.title}</span>
-                      </button>
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
-              ))}
-            </ScrollArea>
+        {/* Desktop Sidebar */}
+        {!isMobile && (
+          <div className="w-[280px] shrink-0 border-r bg-muted/30">
+            <SidebarContent
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              filteredModules={filteredModules}
+              activeLesson={activeLesson}
+              completedLessons={completedLessons}
+              onSelectLesson={handleSelectLesson}
+            />
           </div>
         )}
 
         {/* Main content */}
         <div className="flex-1 overflow-y-auto">
           {activeLesson ? (
-            <div className="mx-auto max-w-4xl p-6">
+            <div className="mx-auto max-w-4xl p-4 sm:p-6">
               {activeLesson.type === "video" && activeLesson.video_url && (
                 <div className="aspect-video overflow-hidden rounded-lg bg-muted">
                   <iframe
@@ -239,18 +265,16 @@ const CoursePlayer = () => {
                   />
                 </div>
               )}
-              <div className="mt-6">
+              <div className="mt-4 sm:mt-6">
                 <div className="flex items-start justify-between gap-4">
-                  <h1 className="font-display text-2xl font-bold">{activeLesson.title}</h1>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => toggleBookmark(activeLesson.id)}>
-                      {bookmarkedLessons.has(activeLesson.id) ? (
-                        <BookmarkCheck className="h-5 w-5 text-primary" />
-                      ) : (
-                        <Bookmark className="h-5 w-5" />
-                      )}
-                    </Button>
-                  </div>
+                  <h1 className="font-display text-xl sm:text-2xl font-bold">{activeLesson.title}</h1>
+                  <Button variant="ghost" size="icon" onClick={() => toggleBookmark(activeLesson.id)}>
+                    {bookmarkedLessons.has(activeLesson.id) ? (
+                      <BookmarkCheck className="h-5 w-5 text-primary" />
+                    ) : (
+                      <Bookmark className="h-5 w-5" />
+                    )}
+                  </Button>
                 </div>
                 {activeLesson.description && (
                   <p className="mt-4 text-muted-foreground whitespace-pre-wrap">{activeLesson.description}</p>
