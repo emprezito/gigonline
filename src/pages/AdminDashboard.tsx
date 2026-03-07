@@ -511,11 +511,6 @@ const AdminDashboard = () => {
                                 {(payout.status === "completed" || payout.status === "failed") && (
                                   <span className="text-sm text-muted-foreground capitalize">{payout.status}</span>
                                 )}
-                                {payout.status === "pending" && (
-                                <Button size="sm" variant="destructive" onClick={() => rejectPayout(payout.id)} className="gap-1 hidden">
-                                  <XCircle className="h-3.5 w-3.5" />
-                                  Reject
-                                </Button>
                               </div>
                             )}
                             {payout.status === "completed" && payout.transfer_reference && (
