@@ -314,9 +314,9 @@ const AffiliateDashboard = () => {
                 Request Withdrawal
               </Button>
             </div>
-            {availableBalance < MIN_WITHDRAWAL && (
+            {availableBalance < minWithdrawal && (
               <p className="text-sm text-muted-foreground">
-                Minimum withdrawal amount is ₦{MIN_WITHDRAWAL.toLocaleString()}. You need ₦{(MIN_WITHDRAWAL - availableBalance).toLocaleString()} more.
+                Minimum withdrawal amount is ₦{minWithdrawal.toLocaleString()}. You need ₦{(minWithdrawal - availableBalance).toLocaleString()} more.
               </p>
             )}
             {payoutHistory.some((p) => p.status === "pending" || p.status === "processing") && (
