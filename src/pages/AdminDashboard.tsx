@@ -30,6 +30,8 @@ const AdminDashboard = () => {
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingPayoutId, setProcessingPayoutId] = useState<string | null>(null);
+  const [minWithdrawal, setMinWithdrawal] = useState("20000");
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // Form states
   const [courseForm, setCourseForm] = useState({ title: "", description: "", price: 49999, commission_rate: 50, published: false });
