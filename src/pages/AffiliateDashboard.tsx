@@ -42,8 +42,6 @@ const NIGERIAN_BANKS = [
   { name: "Zenith Bank", code: "057" },
 ];
 
-const MIN_WITHDRAWAL = 20000;
-
 const AffiliateDashboard = () => {
   const { user, hasRole, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -56,6 +54,7 @@ const AffiliateDashboard = () => {
   const [availableBalance, setAvailableBalance] = useState(0);
   const [payoutHistory, setPayoutHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [minWithdrawal, setMinWithdrawal] = useState(20000);
 
   // Bank details state
   const [bankCode, setBankCode] = useState("");
@@ -81,6 +80,14 @@ const AffiliateDashboard = () => {
       .single();
 
     if (!aff) { setLoading(false); return; }
+
+    // Fetch min withdrawal setting
+    const { data: settingData } = await supabase
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "min_withdrawal")
+      .single();
+    if (settingData?.value) setMinWithdrawal(Number(settingData.value));
     setAffiliate(aff);
     setBankCode(aff.bank_code || "");
     setAccountNumber(aff.account_number || "");
@@ -177,7 +184,7 @@ const AffiliateDashboard = () => {
   };
 
   const requestPayout = async () => {
-    if (!affiliate || availableBalance < MIN_WITHDRAWAL) return;
+    if (!affiliate || availableBalance < minWithdrawal) return;
     if (!affiliate.bank_code || !affiliate.account_number) {
       toast({ title: "Add bank details first", description: "Please save your bank details before requesting a payout.", variant: "destructive" });
       return;
@@ -226,7 +233,7 @@ const AffiliateDashboard = () => {
   };
 
   const status = getStatusConfig();
-  const canWithdraw = availableBalance >= MIN_WITHDRAWAL && !payoutHistory.some((p) => p.status === "pending" || p.status === "processing");
+  const canWithdraw = availableBalance >= minWithdrawal && !payoutHistory.some((p) => p.status === "pending" || p.status === "processing");
 
   const getPayoutStatusBadge = (s: string) => {
     switch (s) {
@@ -307,9 +314,9 @@ const AffiliateDashboard = () => {
                 Request Withdrawal
               </Button>
             </div>
-            {availableBalance < MIN_WITHDRAWAL && (
+            {availableBalance < minWithdrawal && (
               <p className="text-sm text-muted-foreground">
-                Minimum withdrawal amount is ₦{MIN_WITHDRAWAL.toLocaleString()}. You need ₦{(MIN_WITHDRAWAL - availableBalance).toLocaleString()} more.
+                Minimum withdrawal amount is ₦{minWithdrawal.toLocaleString()}. You need ₦{(minWithdrawal - availableBalance).toLocaleString()} more.
               </p>
             )}
             {payoutHistory.some((p) => p.status === "pending" || p.status === "processing") && (

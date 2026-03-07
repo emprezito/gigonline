@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Plus, Pencil, Trash2, DollarSign, Users, BookOpen, TrendingUp, ArrowUpDown, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, DollarSign, Users, BookOpen, TrendingUp, ArrowUpDown, Loader2, CheckCircle, XCircle, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const AdminDashboard = () => {
@@ -30,6 +30,8 @@ const AdminDashboard = () => {
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingPayoutId, setProcessingPayoutId] = useState<string | null>(null);
+  const [minWithdrawal, setMinWithdrawal] = useState("20000");
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // Form states
   const [courseForm, setCourseForm] = useState({ title: "", description: "", price: 49999, commission_rate: 50, published: false });
@@ -47,12 +49,15 @@ const AdminDashboard = () => {
   }, [user, authLoading]);
 
   const fetchAllData = async () => {
-    const [coursesRes, affiliatesRes, salesRes, payoutsRes] = await Promise.all([
+    const [coursesRes, affiliatesRes, salesRes, payoutsRes, settingsRes] = await Promise.all([
       supabase.from("courses").select("*").order("created_at", { ascending: false }),
       supabase.from("affiliates").select("*"),
       supabase.from("sales").select("*").order("created_at", { ascending: false }),
       supabase.from("payouts").select("*, affiliates(referral_code, account_name, bank_name, account_number)").order("created_at", { ascending: false }),
+      supabase.from("platform_settings").select("*").eq("key", "min_withdrawal").single(),
     ]);
+
+    if (settingsRes.data?.value) setMinWithdrawal(settingsRes.data.value);
 
     const affData = affiliatesRes.data || [];
     if (affData.length > 0) {
@@ -62,7 +67,6 @@ const AdminDashboard = () => {
       affData.forEach((a: any) => { a.profile_name = profileMap[a.user_id] || "—"; });
     }
 
-    // Enrich payouts with affiliate profile names
     const payoutsData = payoutsRes.data || [];
     if (payoutsData.length > 0 && affData.length > 0) {
       const affMap = Object.fromEntries(affData.map((a: any) => [a.id, a.profile_name]));
@@ -154,6 +158,22 @@ const AdminDashboard = () => {
     toast({ title: "Payout rejected" });
   };
 
+  const saveMinWithdrawal = async () => {
+    setSavingSettings(true);
+    try {
+      const { error } = await supabase
+        .from("platform_settings")
+        .update({ value: minWithdrawal, updated_at: new Date().toISOString() })
+        .eq("key", "min_withdrawal");
+      if (error) throw error;
+      toast({ title: "Settings saved", description: `Minimum withdrawal set to ₦${Number(minWithdrawal).toLocaleString()}` });
+    } catch (err: any) {
+      toast({ title: "Error saving settings", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   const salesByDay = sales.reduce((acc: any[], sale) => {
     const date = new Date(sale.created_at).toLocaleDateString();
     const existing = acc.find((d) => d.date === date);
@@ -181,7 +201,7 @@ const AdminDashboard = () => {
         <h1 className="font-display text-3xl font-bold">Admin Dashboard</h1>
 
         <Tabs defaultValue="overview" className="mt-8">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="courses">Courses</TabsTrigger>
             <TabsTrigger value="affiliates">Affiliates</TabsTrigger>
@@ -194,6 +214,7 @@ const AdminDashboard = () => {
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           {/* Overview */}
@@ -468,6 +489,30 @@ const AdminDashboard = () => {
                     })}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          {/* Settings */}
+          <TabsContent value="settings" className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle className="font-display">Platform Settings</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="max-w-sm space-y-2">
+                  <Label>Minimum Withdrawal Amount (₦)</Label>
+                  <Input
+                    type="number"
+                    value={minWithdrawal}
+                    onChange={(e) => setMinWithdrawal(e.target.value)}
+                    min={0}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Affiliates must have at least this amount to request a withdrawal.
+                  </p>
+                </div>
+                <Button onClick={saveMinWithdrawal} disabled={savingSettings} className="gap-2">
+                  {savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings className="h-4 w-4" />}
+                  Save Settings
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
