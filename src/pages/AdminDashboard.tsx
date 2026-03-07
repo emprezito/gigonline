@@ -49,12 +49,15 @@ const AdminDashboard = () => {
   }, [user, authLoading]);
 
   const fetchAllData = async () => {
-    const [coursesRes, affiliatesRes, salesRes, payoutsRes] = await Promise.all([
+    const [coursesRes, affiliatesRes, salesRes, payoutsRes, settingsRes] = await Promise.all([
       supabase.from("courses").select("*").order("created_at", { ascending: false }),
       supabase.from("affiliates").select("*"),
       supabase.from("sales").select("*").order("created_at", { ascending: false }),
       supabase.from("payouts").select("*, affiliates(referral_code, account_name, bank_name, account_number)").order("created_at", { ascending: false }),
+      supabase.from("platform_settings").select("*").eq("key", "min_withdrawal").single(),
     ]);
+
+    if (settingsRes.data?.value) setMinWithdrawal(settingsRes.data.value);
 
     const affData = affiliatesRes.data || [];
     if (affData.length > 0) {
@@ -64,7 +67,6 @@ const AdminDashboard = () => {
       affData.forEach((a: any) => { a.profile_name = profileMap[a.user_id] || "—"; });
     }
 
-    // Enrich payouts with affiliate profile names
     const payoutsData = payoutsRes.data || [];
     if (payoutsData.length > 0 && affData.length > 0) {
       const affMap = Object.fromEntries(affData.map((a: any) => [a.id, a.profile_name]));
