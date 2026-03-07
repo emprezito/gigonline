@@ -492,6 +492,30 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
           </TabsContent>
+          {/* Settings */}
+          <TabsContent value="settings" className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle className="font-display">Platform Settings</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="max-w-sm space-y-2">
+                  <Label>Minimum Withdrawal Amount (₦)</Label>
+                  <Input
+                    type="number"
+                    value={minWithdrawal}
+                    onChange={(e) => setMinWithdrawal(e.target.value)}
+                    min={0}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Affiliates must have at least this amount to request a withdrawal.
+                  </p>
+                </div>
+                <Button onClick={saveMinWithdrawal} disabled={savingSettings} className="gap-2">
+                  {savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings className="h-4 w-4" />}
+                  Save Settings
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </div>
