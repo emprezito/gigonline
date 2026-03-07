@@ -184,7 +184,7 @@ const AffiliateDashboard = () => {
   };
 
   const requestPayout = async () => {
-    if (!affiliate || availableBalance < MIN_WITHDRAWAL) return;
+    if (!affiliate || availableBalance < minWithdrawal) return;
     if (!affiliate.bank_code || !affiliate.account_number) {
       toast({ title: "Add bank details first", description: "Please save your bank details before requesting a payout.", variant: "destructive" });
       return;
