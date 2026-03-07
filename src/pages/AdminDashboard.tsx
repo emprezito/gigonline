@@ -201,7 +201,7 @@ const AdminDashboard = () => {
         <h1 className="font-display text-3xl font-bold">Admin Dashboard</h1>
 
         <Tabs defaultValue="overview" className="mt-8">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="courses">Courses</TabsTrigger>
             <TabsTrigger value="affiliates">Affiliates</TabsTrigger>
@@ -214,6 +214,7 @@ const AdminDashboard = () => {
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           {/* Overview */}
