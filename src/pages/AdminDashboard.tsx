@@ -138,15 +138,30 @@ const AdminDashboard = () => {
   const approvePayout = async (payoutId: string) => {
     setProcessingPayoutId(payoutId);
     try {
-      const { data, error } = await supabase.functions.invoke("process-payout", {
-        body: { payoutId },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast({ title: "Payout approved & processed!", description: data?.message || "Transfer initiated." });
+      await supabase
+        .from("payouts")
+        .update({ status: "processing", approved_at: new Date().toISOString() })
+        .eq("id", payoutId);
+      toast({ title: "Payout approved", description: "Transfer the funds manually, then mark as completed." });
       fetchAllData();
     } catch (err: any) {
-      toast({ title: "Payout failed", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setProcessingPayoutId(null);
+    }
+  };
+
+  const markPayoutCompleted = async (payoutId: string) => {
+    setProcessingPayoutId(payoutId);
+    try {
+      await supabase
+        .from("payouts")
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("id", payoutId);
+      toast({ title: "Payout marked as completed" });
+      fetchAllData();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setProcessingPayoutId(null);
     }
