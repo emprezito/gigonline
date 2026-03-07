@@ -474,48 +474,43 @@ const AdminDashboard = () => {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {payout.status === "pending" && (
-                              <div className="flex gap-2">
-                                {payout.status === "pending" && (
-                                  <>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => approvePayout(payout.id)}
-                                      disabled={processingPayoutId === payout.id}
-                                      className="gap-1"
-                                    >
-                                      {processingPayoutId === payout.id ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                      ) : (
-                                        <CheckCircle className="h-3.5 w-3.5" />
-                                      )}
-                                      Approve
-                                    </Button>
-                                    <Button size="sm" variant="destructive" onClick={() => rejectPayout(payout.id)} className="gap-1">
-                                      Reject
-                                    </Button>
-                                  </>
-                                )}
-                                {payout.status === "processing" && (
+                            <div className="flex gap-2 items-center">
+                              {payout.status === "pending" && (
+                                <>
                                   <Button
                                     size="sm"
-                                    variant="outline"
-                                    onClick={() => markPayoutCompleted(payout.id)}
+                                    onClick={() => approvePayout(payout.id)}
                                     disabled={processingPayoutId === payout.id}
                                     className="gap-1"
                                   >
-                                    <CheckCircle className="h-3.5 w-3.5" />
-                                    Mark as Paid
+                                    {processingPayoutId === payout.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <CheckCircle className="h-3.5 w-3.5" />
+                                    )}
+                                    Approve
                                   </Button>
-                                )}
-                                {(payout.status === "completed" || payout.status === "failed") && (
-                                  <span className="text-sm text-muted-foreground capitalize">{payout.status}</span>
-                                )}
-                              </div>
-                            )}
-                            {payout.status === "completed" && payout.transfer_reference && (
-                              <span className="font-mono text-xs text-muted-foreground">{payout.transfer_reference}</span>
-                            )}
+                                  <Button size="sm" variant="destructive" onClick={() => rejectPayout(payout.id)} className="gap-1">
+                                    Reject
+                                  </Button>
+                                </>
+                              )}
+                              {payout.status === "processing" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => markPayoutCompleted(payout.id)}
+                                  disabled={processingPayoutId === payout.id}
+                                  className="gap-1"
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  Mark as Paid
+                                </Button>
+                              )}
+                              {(payout.status === "completed" || payout.status === "failed") && (
+                                <span className="text-sm text-muted-foreground capitalize">{payout.status}</span>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
