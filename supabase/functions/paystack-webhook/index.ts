@@ -70,8 +70,7 @@ serve(async (req) => {
         .single();
 
       if (aff?.approved && aff?.enabled) {
-        const rate = aff.commission_rate || 30;
-        commissionAmount = Math.round((amountNaira * rate) / 100);
+        commissionAmount = Math.round((amountNaira * 50) / 100);
       }
     }
 

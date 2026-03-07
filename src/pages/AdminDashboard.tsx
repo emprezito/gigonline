@@ -476,20 +476,43 @@ const AdminDashboard = () => {
                           <TableCell>
                             {payout.status === "pending" && (
                               <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => approvePayout(payout.id)}
-                                  disabled={processingPayoutId === payout.id}
-                                  className="gap-1"
-                                >
-                                  {processingPayoutId === payout.id ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
+                                {payout.status === "pending" && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => approvePayout(payout.id)}
+                                      disabled={processingPayoutId === payout.id}
+                                      className="gap-1"
+                                    >
+                                      {processingPayoutId === payout.id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <CheckCircle className="h-3.5 w-3.5" />
+                                      )}
+                                      Approve
+                                    </Button>
+                                    <Button size="sm" variant="destructive" onClick={() => rejectPayout(payout.id)} className="gap-1">
+                                      Reject
+                                    </Button>
+                                  </>
+                                )}
+                                {payout.status === "processing" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => markPayoutCompleted(payout.id)}
+                                    disabled={processingPayoutId === payout.id}
+                                    className="gap-1"
+                                  >
                                     <CheckCircle className="h-3.5 w-3.5" />
-                                  )}
-                                  Approve & Pay
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={() => rejectPayout(payout.id)} className="gap-1">
+                                    Mark as Paid
+                                  </Button>
+                                )}
+                                {(payout.status === "completed" || payout.status === "failed") && (
+                                  <span className="text-sm text-muted-foreground capitalize">{payout.status}</span>
+                                )}
+                                {payout.status === "pending" && (
+                                <Button size="sm" variant="destructive" onClick={() => rejectPayout(payout.id)} className="gap-1 hidden">
                                   <XCircle className="h-3.5 w-3.5" />
                                   Reject
                                 </Button>
