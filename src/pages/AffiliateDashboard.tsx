@@ -42,8 +42,6 @@ const NIGERIAN_BANKS = [
   { name: "Zenith Bank", code: "057" },
 ];
 
-const MIN_WITHDRAWAL = 20000;
-
 const AffiliateDashboard = () => {
   const { user, hasRole, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -56,6 +54,7 @@ const AffiliateDashboard = () => {
   const [availableBalance, setAvailableBalance] = useState(0);
   const [payoutHistory, setPayoutHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [minWithdrawal, setMinWithdrawal] = useState(20000);
 
   // Bank details state
   const [bankCode, setBankCode] = useState("");
