@@ -158,6 +158,22 @@ const AdminDashboard = () => {
     toast({ title: "Payout rejected" });
   };
 
+  const saveMinWithdrawal = async () => {
+    setSavingSettings(true);
+    try {
+      const { error } = await supabase
+        .from("platform_settings")
+        .update({ value: minWithdrawal, updated_at: new Date().toISOString() })
+        .eq("key", "min_withdrawal");
+      if (error) throw error;
+      toast({ title: "Settings saved", description: `Minimum withdrawal set to ₦${Number(minWithdrawal).toLocaleString()}` });
+    } catch (err: any) {
+      toast({ title: "Error saving settings", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   const salesByDay = sales.reduce((acc: any[], sale) => {
     const date = new Date(sale.created_at).toLocaleDateString();
     const existing = acc.find((d) => d.date === date);
