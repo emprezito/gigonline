@@ -18,6 +18,7 @@ const ProfileSettings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [affiliateLoading, setAffiliateLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile", user?.id],
@@ -32,10 +33,11 @@ const ProfileSettings = () => {
   const [bio, setBio] = useState("");
   const [isPublic, setIsPublic] = useState(false);
 
-  if (profile && !fullName && !bio && !isPublic) {
+  if (profile && !initialized) {
     setFullName(profile.full_name || "");
     setBio(profile.bio || "");
     setIsPublic((profile as any).is_public ?? false);
+    setInitialized(true);
   }
 
   const updateProfile = useMutation({
