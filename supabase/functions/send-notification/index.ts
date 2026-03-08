@@ -106,18 +106,18 @@ serve(async (req) => {
       return { emails, userIds };
     };
 
-    // Helper to get affiliate email
-    const getAffiliateEmail = async (affiliateId: string): Promise<string | null> => {
+    // Helper to get affiliate info
+    const getAffiliateInfo = async (affiliateId: string): Promise<{ email: string | null; userId: string | null }> => {
       const { data: aff } = await supabase
         .from("affiliates")
         .select("user_id")
         .eq("id", affiliateId)
         .single();
 
-      if (!aff) return null;
+      if (!aff) return { email: null, userId: null };
 
       const { data: userData } = await supabase.auth.admin.getUserById(aff.user_id);
-      return userData?.user?.email ?? null;
+      return { email: userData?.user?.email ?? null, userId: aff.user_id };
     };
 
     switch (type) {
@@ -129,8 +129,7 @@ serve(async (req) => {
           affiliateId?: string;
         };
 
-        // Notify admins
-        const adminEmails = await getAdminEmails();
+        const { emails: adminEmails, userIds: adminUserIds } = await getAdminInfo();
         for (const email of adminEmails) {
           await sendEmail(
             email,
@@ -144,6 +143,7 @@ serve(async (req) => {
             )
           );
         }
+        await sendPush(adminUserIds, "💰 New Sale", `${formatCurrency(amount)} — ${courseTitle}`, "/admin");
         break;
       }
 
@@ -155,7 +155,7 @@ serve(async (req) => {
           courseTitle: string;
         };
 
-        const email = await getAffiliateEmail(affiliateId);
+        const { email, userId } = await getAffiliateInfo(affiliateId);
         if (email) {
           await sendEmail(
             email,
@@ -169,6 +169,7 @@ serve(async (req) => {
             )
           );
         }
+        if (userId) await sendPush([userId], "🎉 Commission Earned!", `You earned ${formatCurrency(commission)} from a referral sale`, "/affiliate");
         break;
       }
 
@@ -179,7 +180,7 @@ serve(async (req) => {
           affiliateName: string;
         };
 
-        const adminEmails = await getAdminEmails();
+        const { emails: adminEmails, userIds: adminUserIds } = await getAdminInfo();
         for (const email of adminEmails) {
           await sendEmail(
             email,
@@ -192,6 +193,7 @@ serve(async (req) => {
             )
           );
         }
+        await sendPush(adminUserIds, "📤 Payout Request", `${affiliateName} requested ${formatCurrency(amount)}`, "/admin");
         break;
       }
 
@@ -201,7 +203,7 @@ serve(async (req) => {
           amount: number;
         };
 
-        const email = await getAffiliateEmail(affiliateId);
+        const { email, userId } = await getAffiliateInfo(affiliateId);
         if (email) {
           await sendEmail(
             email,
@@ -213,6 +215,7 @@ serve(async (req) => {
             )
           );
         }
+        if (userId) await sendPush([userId], "✅ Payout Approved", `Your ${formatCurrency(amount)} withdrawal has been approved`, "/affiliate");
         break;
       }
 
@@ -222,7 +225,7 @@ serve(async (req) => {
           amount: number;
         };
 
-        const email = await getAffiliateEmail(affiliateId);
+        const { email, userId } = await getAffiliateInfo(affiliateId);
         if (email) {
           await sendEmail(
             email,
@@ -234,6 +237,7 @@ serve(async (req) => {
             )
           );
         }
+        if (userId) await sendPush([userId], "💸 Payout Sent!", `${formatCurrency(amount)} has been transferred to your bank`, "/affiliate");
         break;
       }
     }
