@@ -138,12 +138,17 @@ const AdminDashboard = () => {
   const approvePayout = async (payoutId: string) => {
     setProcessingPayoutId(payoutId);
     try {
-      await supabase
+      const { data: updatedPayout, error } = await supabase
         .from("payouts")
         .update({ status: "processing", approved_at: new Date().toISOString() })
-        .eq("id", payoutId);
+        .eq("id", payoutId)
+        .select("id, status, approved_at")
+        .single();
+
+      if (error) throw error;
+
+      setPayouts((prev) => prev.map((p) => (p.id === payoutId ? { ...p, ...updatedPayout } : p)));
       toast({ title: "Payout approved", description: "Transfer the funds manually, then mark as completed." });
-      fetchAllData();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -154,12 +159,17 @@ const AdminDashboard = () => {
   const markPayoutCompleted = async (payoutId: string) => {
     setProcessingPayoutId(payoutId);
     try {
-      await supabase
+      const { data: updatedPayout, error } = await supabase
         .from("payouts")
         .update({ status: "completed", completed_at: new Date().toISOString() })
-        .eq("id", payoutId);
+        .eq("id", payoutId)
+        .select("id, status, completed_at")
+        .single();
+
+      if (error) throw error;
+
+      setPayouts((prev) => prev.map((p) => (p.id === payoutId ? { ...p, ...updatedPayout } : p)));
       toast({ title: "Payout marked as completed" });
-      fetchAllData();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -168,9 +178,21 @@ const AdminDashboard = () => {
   };
 
   const rejectPayout = async (payoutId: string) => {
-    await supabase.from("payouts").update({ status: "failed" }).eq("id", payoutId);
-    fetchAllData();
-    toast({ title: "Payout rejected" });
+    try {
+      const { data: updatedPayout, error } = await supabase
+        .from("payouts")
+        .update({ status: "failed" })
+        .eq("id", payoutId)
+        .select("id, status")
+        .single();
+
+      if (error) throw error;
+
+      setPayouts((prev) => prev.map((p) => (p.id === payoutId ? { ...p, ...updatedPayout } : p)));
+      toast({ title: "Payout rejected" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   };
 
   const saveMinWithdrawal = async () => {

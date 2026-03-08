@@ -17,6 +17,8 @@ async function verifySignature(secret: string, body: string, signature: string):
   return hash === signature;
 }
 
+const AFFILIATE_COMMISSION_RATE = 50;
+
 serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
