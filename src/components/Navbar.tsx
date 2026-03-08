@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { PushNotificationToggle } from "@/components/PushNotificationToggle";
 import { Button } from "@/components/ui/button";
 import { Menu, X, GraduationCap } from "lucide-react";
 import { useState } from "react";
@@ -35,6 +36,7 @@ export const Navbar = () => {
           <Link to="/#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
           <Link to="/#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">FAQ</Link>
           <ThemeToggle />
+          {user && <PushNotificationToggle />}
           {user ? (
             <>
               <Button variant="ghost" size="sm" onClick={() => navigate(getDashboardLink())}>Dashboard</Button>
@@ -54,6 +56,7 @@ export const Navbar = () => {
         {/* Mobile */}
         <div className="flex items-center gap-2 md:hidden">
           <ThemeToggle />
+          {user && <PushNotificationToggle />}
           <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
