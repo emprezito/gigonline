@@ -480,34 +480,28 @@ export type Database = {
       }
     }
     Views: {
-      referral_clicks_safe: {
-        Row: {
-          affiliate_id: string | null
-          created_at: string | null
-          id: string | null
-        }
-        Insert: {
-          affiliate_id?: string | null
-          created_at?: string | null
-          id?: string | null
-        }
-        Update: {
-          affiliate_id?: string | null
-          created_at?: string | null
-          id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "referral_clicks_affiliate_id_fkey"
-            columns: ["affiliate_id"]
-            isOneToOne: false
-            referencedRelation: "affiliates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
+      get_affiliate_clicks: {
+        Args: { p_affiliate_id: string }
+        Returns: {
+          affiliate_id: string
+          created_at: string
+          id: string
+        }[]
+      }
+      get_affiliate_sales: {
+        Args: { p_affiliate_id: string }
+        Returns: {
+          amount: number
+          commission_amount: number
+          course_id: string
+          created_at: string
+          id: string
+          status: string
+        }[]
+      }
       get_platform_setting: { Args: { p_key: string }; Returns: string }
       has_role: {
         Args: {
