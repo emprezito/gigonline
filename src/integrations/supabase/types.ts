@@ -308,18 +308,21 @@ export type Database = {
       platform_settings: {
         Row: {
           id: string
+          is_public: boolean
           key: string
           updated_at: string
           value: string
         }
         Insert: {
           id?: string
+          is_public?: boolean
           key: string
           updated_at?: string
           value: string
         }
         Update: {
           id?: string
+          is_public?: boolean
           key?: string
           updated_at?: string
           value?: string
@@ -510,6 +513,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_get_platform_setting: { Args: { p_key: string }; Returns: string }
       get_affiliate_clicks: {
         Args: { p_affiliate_id: string }
         Returns: {
