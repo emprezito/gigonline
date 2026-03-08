@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Plus, Pencil, Trash2, DollarSign, Users, BookOpen, TrendingUp, ArrowUpDown, Loader2, CheckCircle, XCircle, Settings } from "lucide-react";
+import { Plus, Pencil, Trash2, DollarSign, Users, BookOpen, TrendingUp, ArrowUpDown, Loader2, CheckCircle, XCircle, Settings, Bell } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const AdminDashboard = () => {
@@ -32,6 +32,9 @@ const AdminDashboard = () => {
   const [processingPayoutId, setProcessingPayoutId] = useState<string | null>(null);
   const [minWithdrawal, setMinWithdrawal] = useState("20000");
   const [savingSettings, setSavingSettings] = useState(false);
+  const [testNotifTitle, setTestNotifTitle] = useState("🎉 Test Notification");
+  const [testNotifBody, setTestNotifBody] = useState("This is a test push notification from GhostPen!");
+  const [sendingTestNotif, setSendingTestNotif] = useState(false);
 
   // Form states
   const [courseForm, setCourseForm] = useState({ title: "", description: "", price: 49999, commission_rate: 50, published: false });
@@ -576,6 +579,55 @@ const AdminDashboard = () => {
                 <Button onClick={saveMinWithdrawal} disabled={savingSettings} className="gap-2">
                   {savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings className="h-4 w-4" />}
                   Save Settings
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="font-display flex items-center gap-2"><Bell className="h-5 w-5" /> Send Test Push Notification</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="max-w-md space-y-3">
+                  <div className="space-y-2">
+                    <Label>Title</Label>
+                    <Input value={testNotifTitle} onChange={(e) => setTestNotifTitle(e.target.value)} placeholder="Notification title" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Message</Label>
+                    <Textarea value={testNotifBody} onChange={(e) => setTestNotifBody(e.target.value)} placeholder="Notification body" rows={3} />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    This sends a push notification to all users with active subscriptions.
+                  </p>
+                </div>
+                <Button
+                  onClick={async () => {
+                    setSendingTestNotif(true);
+                    try {
+                      const { data: subs } = await supabase.from("push_subscriptions").select("user_id");
+                      const userIds = [...new Set((subs || []).map((s: any) => s.user_id))];
+                      if (userIds.length === 0) {
+                        toast({ title: "No subscribers", description: "No users have enabled push notifications yet.", variant: "destructive" });
+                        return;
+                      }
+                      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                      const res = await fetch(`${supabaseUrl}/functions/v1/send-push`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
+                        body: JSON.stringify({ userIds, title: testNotifTitle, body: testNotifBody, url: "/" }),
+                      });
+                      const result = await res.json();
+                      toast({ title: "Notification sent!", description: `Delivered to ${result.sent || 0} of ${result.total || 0} subscriptions.` });
+                    } catch (err: any) {
+                      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+                    } finally {
+                      setSendingTestNotif(false);
+                    }
+                  }}
+                  disabled={sendingTestNotif}
+                  className="gap-2"
+                >
+                  {sendingTestNotif ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
+                  Send Test Notification
                 </Button>
               </CardContent>
             </Card>
