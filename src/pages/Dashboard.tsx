@@ -88,10 +88,7 @@ const Dashboard = () => {
 
       const { data, error } = await supabase.functions.invoke("create-payment", {
         body: {
-          email: user.email,
-          amount: course.price,
           courseId,
-          userId: user.id,
           callbackUrl: `${window.location.origin}/payment/verify`,
           referralCode,
         },
