@@ -72,6 +72,31 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Auth guard: only admins or service-role callers allowed
+    const authHeader = req.headers.get("authorization") ?? "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+
+    // If the token IS the service role key, allow (internal server-to-server call)
+    const isServiceRole = token === supabaseServiceKey;
+
+    if (!isServiceRole) {
+      // Otherwise validate as a user JWT and check admin role
+      const { data: { user: caller }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !caller) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: caller.id, _role: "admin" });
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const { type, data } = (await req.json()) as NotificationPayload;
 
     // Helper to send push notification
