@@ -319,7 +319,7 @@ const AffiliateDashboard = () => {
                 Minimum withdrawal amount is ₦{minWithdrawal.toLocaleString()}. You need ₦{(minWithdrawal - availableBalance).toLocaleString()} more.
               </p>
             )}
-            {payoutHistory.some((p) => p.status === "pending" || p.status === "processing") && (
+            {payoutHistory.some((p) => p.status === "pending" || p.status === "approved") && (
               <p className="text-sm text-amber-600">You have a pending withdrawal request being processed.</p>
             )}
           </CardContent>
