@@ -83,11 +83,8 @@ const AffiliateDashboard = () => {
 
     // Fetch min withdrawal setting
     const { data: settingData } = await supabase
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "min_withdrawal")
-      .single();
-    if (settingData?.value) setMinWithdrawal(Number(settingData.value));
+      .rpc("get_platform_setting", { p_key: "min_withdrawal" });
+    if (settingData) setMinWithdrawal(Number(settingData));
     setAffiliate(aff);
     setBankCode(aff.bank_code || "");
     setAccountNumber(aff.account_number || "");
