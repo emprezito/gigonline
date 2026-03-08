@@ -221,7 +221,7 @@ const AdminDashboard = () => {
 
   const totalRevenue = sales.filter((s) => s.status === "completed").reduce((sum, s) => sum + s.amount, 0);
   const pendingPayoutsCount = payouts.filter((p) => p.status === "pending").length;
-  const completedPayoutsTotal = payouts.filter((p) => p.status === "completed").reduce((sum, p) => sum + p.amount, 0);
+  const completedPayoutsTotal = payouts.filter((p) => p.status === "paid" || p.status === "completed").reduce((sum, p) => sum + p.amount, 0);
 
   if (authLoading || loading) {
     return (
