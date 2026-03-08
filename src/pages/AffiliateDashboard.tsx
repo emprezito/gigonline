@@ -237,8 +237,8 @@ const AffiliateDashboard = () => {
 
   const getPayoutStatusBadge = (s: string) => {
     switch (s) {
-      case "completed": return <Badge className="bg-green-500/10 text-green-600 border-green-500/30">Completed</Badge>;
-      case "processing": return <Badge variant="secondary">Processing</Badge>;
+      case "paid": return <Badge className="bg-green-500/10 text-green-600 border-green-500/30">Paid</Badge>;
+      case "approved": return <Badge variant="secondary">Approved</Badge>;
       case "pending": return <Badge variant="outline">Pending</Badge>;
       case "failed": return <Badge variant="destructive">Failed</Badge>;
       default: return <Badge variant="outline">{s}</Badge>;
