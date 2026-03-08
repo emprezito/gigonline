@@ -7,6 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const AFFILIATE_COMMISSION_RATE = 50;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -76,13 +78,12 @@ serve(async (req) => {
     if (affiliate_id) {
       const { data: aff } = await supabase
         .from("affiliates")
-        .select("commission_rate, approved, enabled")
+        .select("approved, enabled")
         .eq("id", affiliate_id)
         .single();
 
       if (aff?.approved && aff?.enabled) {
-        const rate = aff.commission_rate || 30;
-        commissionAmount = Math.round((amountNaira * rate) / 100);
+        commissionAmount = Math.round((amountNaira * AFFILIATE_COMMISSION_RATE) / 100);
       }
     }
 

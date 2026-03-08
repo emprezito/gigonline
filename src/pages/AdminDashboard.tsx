@@ -138,12 +138,17 @@ const AdminDashboard = () => {
   const approvePayout = async (payoutId: string) => {
     setProcessingPayoutId(payoutId);
     try {
-      await supabase
+      const { data: updatedPayout, error } = await supabase
         .from("payouts")
         .update({ status: "processing", approved_at: new Date().toISOString() })
-        .eq("id", payoutId);
+        .eq("id", payoutId)
+        .select("id, status, approved_at")
+        .single();
+
+      if (error) throw error;
+
+      setPayouts((prev) => prev.map((p) => (p.id === payoutId ? { ...p, ...updatedPayout } : p)));
       toast({ title: "Payout approved", description: "Transfer the funds manually, then mark as completed." });
-      fetchAllData();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -154,12 +159,17 @@ const AdminDashboard = () => {
   const markPayoutCompleted = async (payoutId: string) => {
     setProcessingPayoutId(payoutId);
     try {
-      await supabase
+      const { data: updatedPayout, error } = await supabase
         .from("payouts")
         .update({ status: "completed", completed_at: new Date().toISOString() })
-        .eq("id", payoutId);
+        .eq("id", payoutId)
+        .select("id, status, completed_at")
+        .single();
+
+      if (error) throw error;
+
+      setPayouts((prev) => prev.map((p) => (p.id === payoutId ? { ...p, ...updatedPayout } : p)));
       toast({ title: "Payout marked as completed" });
-      fetchAllData();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -168,9 +178,21 @@ const AdminDashboard = () => {
   };
 
   const rejectPayout = async (payoutId: string) => {
-    await supabase.from("payouts").update({ status: "failed" }).eq("id", payoutId);
-    fetchAllData();
-    toast({ title: "Payout rejected" });
+    try {
+      const { data: updatedPayout, error } = await supabase
+        .from("payouts")
+        .update({ status: "failed" })
+        .eq("id", payoutId)
+        .select("id, status")
+        .single();
+
+      if (error) throw error;
+
+      setPayouts((prev) => prev.map((p) => (p.id === payoutId ? { ...p, ...updatedPayout } : p)));
+      toast({ title: "Payout rejected" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   };
 
   const saveMinWithdrawal = async () => {
@@ -456,6 +478,8 @@ const AdminDashboard = () => {
                   <TableBody>
                     {payouts.map((payout) => {
                       const affInfo = (payout as any).affiliates;
+                      const payoutStatus = payout.status === "paid" ? "completed" : payout.status;
+
                       return (
                         <TableRow key={payout.id}>
                           <TableCell>{(payout as any).affiliate_name || "—"}</TableCell>
@@ -466,16 +490,16 @@ const AdminDashboard = () => {
                           <TableCell>{new Date(payout.created_at).toLocaleDateString()}</TableCell>
                           <TableCell>
                             <Badge variant={
-                              payout.status === "completed" ? "default" :
-                              payout.status === "processing" ? "secondary" :
-                              payout.status === "failed" ? "destructive" : "outline"
+                              payoutStatus === "completed" ? "default" :
+                              payoutStatus === "processing" ? "secondary" :
+                              payoutStatus === "failed" ? "destructive" : "outline"
                             }>
-                              {payout.status}
+                              {payoutStatus}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2 items-center">
-                              {payout.status === "pending" && (
+                              {payoutStatus === "pending" && (
                                 <>
                                   <Button
                                     size="sm"
@@ -495,7 +519,7 @@ const AdminDashboard = () => {
                                   </Button>
                                 </>
                               )}
-                              {payout.status === "processing" && (
+                              {payoutStatus === "processing" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -503,12 +527,12 @@ const AdminDashboard = () => {
                                   disabled={processingPayoutId === payout.id}
                                   className="gap-1"
                                 >
-                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  {processingPayoutId === payout.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
                                   Mark as Paid
                                 </Button>
                               )}
-                              {(payout.status === "completed" || payout.status === "failed") && (
-                                <span className="text-sm text-muted-foreground capitalize">{payout.status}</span>
+                              {(payoutStatus === "completed" || payoutStatus === "failed") && (
+                                <span className="text-sm text-muted-foreground capitalize">{payoutStatus}</span>
                               )}
                             </div>
                           </TableCell>
