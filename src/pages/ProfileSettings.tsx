@@ -99,6 +99,13 @@ const ProfileSettings = () => {
             <div><Label>Email</Label><Input disabled value={user?.email || ""} /></div>
             <div><Label>Full Name</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
             <div><Label>Bio</Label><Textarea value={bio} onChange={(e) => setBio(e.target.value)} /></div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label>Public Profile</Label>
+                <p className="text-sm text-muted-foreground">Allow others to see your profile</p>
+              </div>
+              <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+            </div>
             <Button onClick={() => updateProfile.mutate()} disabled={updateProfile.isPending}>
               {updateProfile.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
