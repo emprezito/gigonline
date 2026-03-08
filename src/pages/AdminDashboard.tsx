@@ -140,7 +140,7 @@ const AdminDashboard = () => {
     try {
       const { data: updatedPayout, error } = await supabase
         .from("payouts")
-        .update({ status: "processing", approved_at: new Date().toISOString() })
+        .update({ status: "approved", approved_at: new Date().toISOString() })
         .eq("id", payoutId)
         .select("id, status, approved_at")
         .single();
@@ -148,7 +148,7 @@ const AdminDashboard = () => {
       if (error) throw error;
 
       setPayouts((prev) => prev.map((p) => (p.id === payoutId ? { ...p, ...updatedPayout } : p)));
-      toast({ title: "Payout approved", description: "Transfer the funds manually, then mark as completed." });
+      toast({ title: "Payout approved", description: "Transfer the funds manually, then mark as paid." });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -161,7 +161,7 @@ const AdminDashboard = () => {
     try {
       const { data: updatedPayout, error } = await supabase
         .from("payouts")
-        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .update({ status: "paid", completed_at: new Date().toISOString() })
         .eq("id", payoutId)
         .select("id, status, completed_at")
         .single();
@@ -169,7 +169,7 @@ const AdminDashboard = () => {
       if (error) throw error;
 
       setPayouts((prev) => prev.map((p) => (p.id === payoutId ? { ...p, ...updatedPayout } : p)));
-      toast({ title: "Payout marked as completed" });
+      toast({ title: "Payout marked as paid" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -221,7 +221,7 @@ const AdminDashboard = () => {
 
   const totalRevenue = sales.filter((s) => s.status === "completed").reduce((sum, s) => sum + s.amount, 0);
   const pendingPayoutsCount = payouts.filter((p) => p.status === "pending").length;
-  const completedPayoutsTotal = payouts.filter((p) => p.status === "completed").reduce((sum, p) => sum + p.amount, 0);
+  const completedPayoutsTotal = payouts.filter((p) => p.status === "paid" || p.status === "completed").reduce((sum, p) => sum + p.amount, 0);
 
   if (authLoading || loading) {
     return (
@@ -478,7 +478,7 @@ const AdminDashboard = () => {
                   <TableBody>
                     {payouts.map((payout) => {
                       const affInfo = (payout as any).affiliates;
-                      const payoutStatus = payout.status === "paid" ? "completed" : payout.status;
+                      const payoutStatus = payout.status;
 
                       return (
                         <TableRow key={payout.id}>
@@ -490,8 +490,8 @@ const AdminDashboard = () => {
                           <TableCell>{new Date(payout.created_at).toLocaleDateString()}</TableCell>
                           <TableCell>
                             <Badge variant={
-                              payoutStatus === "completed" ? "default" :
-                              payoutStatus === "processing" ? "secondary" :
+                              payoutStatus === "paid" ? "default" :
+                              payoutStatus === "approved" ? "secondary" :
                               payoutStatus === "failed" ? "destructive" : "outline"
                             }>
                               {payoutStatus}
@@ -519,7 +519,7 @@ const AdminDashboard = () => {
                                   </Button>
                                 </>
                               )}
-                              {payoutStatus === "processing" && (
+                              {payoutStatus === "approved" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -531,7 +531,7 @@ const AdminDashboard = () => {
                                   Mark as Paid
                                 </Button>
                               )}
-                              {(payoutStatus === "completed" || payoutStatus === "failed") && (
+                              {(payoutStatus === "paid" || payoutStatus === "failed") && (
                                 <span className="text-sm text-muted-foreground capitalize">{payoutStatus}</span>
                               )}
                             </div>

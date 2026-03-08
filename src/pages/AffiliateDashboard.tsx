@@ -191,7 +191,7 @@ const AffiliateDashboard = () => {
     }
 
     // Check for existing pending/processing payouts
-    const hasPending = payoutHistory.some((p) => p.status === "pending" || p.status === "processing");
+    const hasPending = payoutHistory.some((p) => p.status === "pending" || p.status === "approved");
     if (hasPending) {
       toast({ title: "Existing request pending", description: "You already have a pending withdrawal request.", variant: "destructive" });
       return;
@@ -233,12 +233,12 @@ const AffiliateDashboard = () => {
   };
 
   const status = getStatusConfig();
-  const canWithdraw = availableBalance >= minWithdrawal && !payoutHistory.some((p) => p.status === "pending" || p.status === "processing");
+  const canWithdraw = availableBalance >= minWithdrawal && !payoutHistory.some((p) => p.status === "pending" || p.status === "approved");
 
   const getPayoutStatusBadge = (s: string) => {
     switch (s) {
-      case "completed": return <Badge className="bg-green-500/10 text-green-600 border-green-500/30">Completed</Badge>;
-      case "processing": return <Badge variant="secondary">Processing</Badge>;
+      case "paid": return <Badge className="bg-green-500/10 text-green-600 border-green-500/30">Paid</Badge>;
+      case "approved": return <Badge variant="secondary">Approved</Badge>;
       case "pending": return <Badge variant="outline">Pending</Badge>;
       case "failed": return <Badge variant="destructive">Failed</Badge>;
       default: return <Badge variant="outline">{s}</Badge>;
@@ -319,7 +319,7 @@ const AffiliateDashboard = () => {
                 Minimum withdrawal amount is ₦{minWithdrawal.toLocaleString()}. You need ₦{(minWithdrawal - availableBalance).toLocaleString()} more.
               </p>
             )}
-            {payoutHistory.some((p) => p.status === "pending" || p.status === "processing") && (
+            {payoutHistory.some((p) => p.status === "pending" || p.status === "approved") && (
               <p className="text-sm text-amber-600">You have a pending withdrawal request being processed.</p>
             )}
           </CardContent>
