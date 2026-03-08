@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Loader2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,6 +18,7 @@ const ProfileSettings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [affiliateLoading, setAffiliateLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile", user?.id],
@@ -29,15 +31,18 @@ const ProfileSettings = () => {
 
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
 
-  if (profile && !fullName && !bio) {
+  if (profile && !initialized) {
     setFullName(profile.full_name || "");
     setBio(profile.bio || "");
+    setIsPublic((profile as any).is_public ?? false);
+    setInitialized(true);
   }
 
   const updateProfile = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("profiles").update({ full_name: fullName, bio }).eq("id", user!.id);
+      const { error } = await supabase.from("profiles").update({ full_name: fullName, bio, is_public: isPublic } as any).eq("id", user!.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -98,6 +103,13 @@ const ProfileSettings = () => {
             <div><Label>Email</Label><Input disabled value={user?.email || ""} /></div>
             <div><Label>Full Name</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
             <div><Label>Bio</Label><Textarea value={bio} onChange={(e) => setBio(e.target.value)} /></div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label>Public Profile</Label>
+                <p className="text-sm text-muted-foreground">Allow others to see your profile</p>
+              </div>
+              <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+            </div>
             <Button onClick={() => updateProfile.mutate()} disabled={updateProfile.isPending}>
               {updateProfile.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
