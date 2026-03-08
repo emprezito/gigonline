@@ -191,7 +191,7 @@ const AffiliateDashboard = () => {
     }
 
     // Check for existing pending/processing payouts
-    const hasPending = payoutHistory.some((p) => p.status === "pending" || p.status === "processing");
+    const hasPending = payoutHistory.some((p) => p.status === "pending" || p.status === "approved");
     if (hasPending) {
       toast({ title: "Existing request pending", description: "You already have a pending withdrawal request.", variant: "destructive" });
       return;
