@@ -519,7 +519,7 @@ const AdminDashboard = () => {
                                   </Button>
                                 </>
                               )}
-                              {payoutStatus === "processing" && (
+                              {payoutStatus === "approved" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
