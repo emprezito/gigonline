@@ -233,7 +233,7 @@ const AffiliateDashboard = () => {
   };
 
   const status = getStatusConfig();
-  const canWithdraw = availableBalance >= minWithdrawal && !payoutHistory.some((p) => p.status === "pending" || p.status === "processing");
+  const canWithdraw = availableBalance >= minWithdrawal && !payoutHistory.some((p) => p.status === "pending" || p.status === "approved");
 
   const getPayoutStatusBadge = (s: string) => {
     switch (s) {
