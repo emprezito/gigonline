@@ -63,9 +63,15 @@ serve(async (req) => {
     const { metadata, amount } = result.data;
     const { course_id, user_id, affiliate_id } = metadata;
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Verify the caller is the payment owner
+    if (caller.id !== user_id) {
+      return new Response(JSON.stringify({ error: "Forbidden: you can only verify your own payments" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = authSupabase;
 
     // Validate paid amount matches actual course price
     const { data: course } = await supabase
