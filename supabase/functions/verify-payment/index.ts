@@ -46,6 +46,22 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Validate paid amount matches actual course price
+    const { data: course } = await supabase
+      .from("courses")
+      .select("price")
+      .eq("id", course_id)
+      .single();
+
+    const paidAmountNaira = amount / 100;
+    if (!course || paidAmountNaira < course.price) {
+      console.error(`Payment amount mismatch: paid ${paidAmountNaira}, course price ${course?.price}`);
+      return new Response(JSON.stringify({ error: "Payment amount does not match course price" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Check if already processed
     const { data: existingSale } = await supabase
       .from("sales")
@@ -71,8 +87,6 @@ serve(async (req) => {
       });
     }
 
-    const amountNaira = amount / 100;
-
     // Calculate commission if affiliate
     let commissionAmount = 0;
     if (affiliate_id) {
@@ -83,7 +97,7 @@ serve(async (req) => {
         .single();
 
       if (aff?.approved && aff?.enabled) {
-        commissionAmount = Math.round((amountNaira * AFFILIATE_COMMISSION_RATE) / 100);
+        commissionAmount = Math.round((paidAmountNaira * AFFILIATE_COMMISSION_RATE) / 100);
       }
     }
 
@@ -92,7 +106,7 @@ serve(async (req) => {
       user_id,
       course_id,
       affiliate_id: affiliate_id || null,
-      amount: amountNaira,
+      amount: paidAmountNaira,
       commission_amount: commissionAmount,
       payment_ref: reference,
       status: "completed",
