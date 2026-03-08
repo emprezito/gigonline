@@ -169,7 +169,7 @@ const AdminDashboard = () => {
       if (error) throw error;
 
       setPayouts((prev) => prev.map((p) => (p.id === payoutId ? { ...p, ...updatedPayout } : p)));
-      toast({ title: "Payout marked as completed" });
+      toast({ title: "Payout marked as paid" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
