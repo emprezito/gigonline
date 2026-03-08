@@ -480,9 +480,35 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      referral_clicks_safe: {
+        Row: {
+          affiliate_id: string | null
+          created_at: string | null
+          id: string | null
+        }
+        Insert: {
+          affiliate_id?: string | null
+          created_at?: string | null
+          id?: string | null
+        }
+        Update: {
+          affiliate_id?: string | null
+          created_at?: string | null
+          id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_clicks_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      get_platform_setting: { Args: { p_key: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
