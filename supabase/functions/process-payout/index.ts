@@ -78,9 +78,9 @@ serve(async (req) => {
 
       const recipientData = await recipientRes.json();
       if (!recipientRes.ok) {
-        // Revert status
         await supabase.from("payouts").update({ status: "pending", approved_at: null }).eq("id", payoutId);
-        throw new Error(`Failed to create recipient: ${recipientData?.message || JSON.stringify(recipientData)}`);
+        console.error("Failed to create recipient:", recipientData);
+        throw new Error("Failed to create transfer recipient. Please try again.");
       }
 
       recipientCode = recipientData.data.recipient_code;
