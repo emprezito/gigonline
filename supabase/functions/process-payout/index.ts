@@ -108,7 +108,8 @@ serve(async (req) => {
     const transferData = await transferRes.json();
     if (!transferRes.ok) {
       await supabase.from("payouts").update({ status: "failed" }).eq("id", payoutId);
-      throw new Error(`Transfer failed: ${transferData?.message || JSON.stringify(transferData)}`);
+      console.error("Transfer failed:", transferData);
+      throw new Error("Payout transfer failed. Please try again.");
     }
 
     // Update payout with transfer reference
