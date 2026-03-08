@@ -36,6 +36,7 @@ export const Navbar = () => {
           <Link to="/#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
           <Link to="/#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">FAQ</Link>
           <ThemeToggle />
+          {user && <PushNotificationToggle />}
           {user ? (
             <>
               <Button variant="ghost" size="sm" onClick={() => navigate(getDashboardLink())}>Dashboard</Button>
