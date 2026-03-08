@@ -205,6 +205,13 @@ const AffiliateDashboard = () => {
       if (insertError) throw insertError;
 
       toast({ title: "Withdrawal requested!", description: `₦${availableBalance.toLocaleString()} payout request submitted. Awaiting admin approval.` });
+
+      // Notify admin
+      const affiliateName = affiliate.account_name || affiliate.referral_code || "Affiliate";
+      supabase.functions.invoke("send-notification", {
+        body: { type: "payout_requested", data: { affiliateId: affiliate.id, amount: availableBalance, affiliateName } },
+      }).catch(console.error);
+
       await fetchAffiliateData();
     } catch (err: any) {
       toast({ title: "Request failed", description: err.message, variant: "destructive" });

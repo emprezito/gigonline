@@ -49,7 +49,7 @@ serve(async (req) => {
     // Validate paid amount matches actual course price
     const { data: course } = await supabase
       .from("courses")
-      .select("price")
+      .select("price, title")
       .eq("id", course_id)
       .single();
 
