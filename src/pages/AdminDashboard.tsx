@@ -478,7 +478,7 @@ const AdminDashboard = () => {
                   <TableBody>
                     {payouts.map((payout) => {
                       const affInfo = (payout as any).affiliates;
-                      const payoutStatus = payout.status === "paid" ? "completed" : payout.status;
+                      const payoutStatus = payout.status;
 
                       return (
                         <TableRow key={payout.id}>
