@@ -40,7 +40,7 @@ const ProfileSettings = () => {
 
   const updateProfile = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("profiles").update({ full_name: fullName, bio }).eq("id", user!.id);
+      const { error } = await supabase.from("profiles").update({ full_name: fullName, bio, is_public: isPublic } as any).eq("id", user!.id);
       if (error) throw error;
     },
     onSuccess: () => {
