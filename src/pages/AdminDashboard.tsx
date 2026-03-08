@@ -46,10 +46,6 @@ const AdminDashboard = () => {
   const [dialogOpen, setDialogOpen] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && (!user || !hasRole("admin"))) {
-      navigate("/dashboard");
-      return;
-    }
     if (user && hasRole("admin")) fetchAllData();
   }, [user, authLoading]);
 

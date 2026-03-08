@@ -16,6 +16,7 @@ import Dashboard from "./pages/Dashboard";
 import CoursePlayer from "./pages/CoursePlayer";
 import AffiliateDashboard from "./pages/AffiliateDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import { AdminRoute } from "@/components/AdminRoute";
 import ProfileSettings from "./pages/ProfileSettings";
 import NotFound from "./pages/NotFound";
 import PaymentVerify from "./pages/PaymentVerify";
@@ -44,7 +45,7 @@ const App = () => (
               <Route path="/payment/verify" element={<PaymentVerify />} />
               <Route path="/course/:courseId" element={<CoursePlayer />} />
               <Route path="/affiliate" element={<AffiliateDashboard />} />
-              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
               <Route path="/settings" element={<ProfileSettings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
