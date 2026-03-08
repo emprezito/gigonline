@@ -531,7 +531,7 @@ const AdminDashboard = () => {
                                   Mark as Paid
                                 </Button>
                               )}
-                              {(payoutStatus === "completed" || payoutStatus === "failed") && (
+                              {(payoutStatus === "paid" || payoutStatus === "failed") && (
                                 <span className="text-sm text-muted-foreground capitalize">{payoutStatus}</span>
                               )}
                             </div>
