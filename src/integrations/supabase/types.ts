@@ -483,6 +483,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_affiliate_clicks: {
+        Args: { p_affiliate_id: string }
+        Returns: {
+          affiliate_id: string
+          created_at: string
+          id: string
+        }[]
+      }
+      get_affiliate_sales: {
+        Args: { p_affiliate_id: string }
+        Returns: {
+          amount: number
+          commission_amount: number
+          course_id: string
+          created_at: string
+          id: string
+          status: string
+        }[]
+      }
       get_platform_setting: { Args: { p_key: string }; Returns: string }
       has_role: {
         Args: {
