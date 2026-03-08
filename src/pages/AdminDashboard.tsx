@@ -35,6 +35,8 @@ const AdminDashboard = () => {
   const [testNotifTitle, setTestNotifTitle] = useState("🎉 Test Notification");
   const [testNotifBody, setTestNotifBody] = useState("This is a test push notification from GhostPen!");
   const [sendingTestNotif, setSendingTestNotif] = useState(false);
+  const [platformUsers, setPlatformUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   // Form states
   const [courseForm, setCourseForm] = useState({ title: "", description: "", price: 49999, commission_rate: 50, published: false });
@@ -253,9 +255,10 @@ const AdminDashboard = () => {
         <h1 className="font-display text-3xl font-bold">Admin Dashboard</h1>
 
         <Tabs defaultValue="overview" className="mt-8">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="courses">Courses</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="affiliates">Affiliates</TabsTrigger>
             <TabsTrigger value="sales">Sales</TabsTrigger>
             <TabsTrigger value="payouts" className="relative">
@@ -559,6 +562,88 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Users */}
+          <TabsContent value="users" className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="font-display flex items-center gap-2"><Users className="h-5 w-5" /> Platform Users</CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    setLoadingUsers(true);
+                    try {
+                      const session = (await supabase.auth.getSession()).data.session;
+                      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/list-users`, {
+                        headers: {
+                          "Content-Type": "application/json",
+                          "Authorization": `Bearer ${session?.access_token}`,
+                        },
+                      });
+                      const data = await res.json();
+                      setPlatformUsers(data.users || []);
+                    } catch (err: any) {
+                      toast({ title: "Error loading users", description: err.message, variant: "destructive" });
+                    } finally {
+                      setLoadingUsers(false);
+                    }
+                  }}
+                  disabled={loadingUsers}
+                  className="gap-2"
+                >
+                  {loadingUsers ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                  {platformUsers.length > 0 ? "Refresh" : "Load Users"}
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {platformUsers.length === 0 && !loadingUsers ? (
+                  <p className="text-sm text-muted-foreground">Click "Load Users" to fetch all platform users.</p>
+                ) : loadingUsers ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Roles</TableHead>
+                        <TableHead>Courses</TableHead>
+                        <TableHead>Joined</TableHead>
+                        <TableHead>Last Sign In</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {platformUsers.map((u: any) => (
+                        <TableRow key={u.id}>
+                          <TableCell className="font-medium">{u.full_name || "—"}</TableCell>
+                          <TableCell>{u.email}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1 flex-wrap">
+                              {u.roles.map((r: string) => (
+                                <Badge key={r} variant={r === "admin" ? "destructive" : r === "affiliate" ? "secondary" : "outline"} className="text-xs">
+                                  {r}
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell>{u.enrollments}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString() : "Never"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+                {platformUsers.length > 0 && (
+                  <p className="mt-4 text-sm text-muted-foreground">{platformUsers.length} total users</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Settings */}
           <TabsContent value="settings" className="space-y-6">
             <Card>
