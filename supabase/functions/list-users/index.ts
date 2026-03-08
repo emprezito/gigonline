@@ -88,7 +88,7 @@ serve(async (req) => {
     });
   } catch (error: unknown) {
     console.error("List users error:", error);
-    return new Response(JSON.stringify({ error: String(error) }), {
+    return new Response(JSON.stringify({ error: "Unable to fetch users" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

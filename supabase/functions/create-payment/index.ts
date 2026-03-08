@@ -96,18 +96,21 @@ serve(async (req) => {
       }),
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(`Paystack error [${res.status}]: ${JSON.stringify(data)}`);
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.status) {
+      console.error("Paystack initialize failed:", { status: res.status, body: data });
+      return new Response(JSON.stringify({ error: "Payment initialization failed. Please try again." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Unknown error";
-    console.error("create-payment error:", msg);
-    return new Response(JSON.stringify({ error: msg }), {
+    console.error("create-payment error:", error);
+    return new Response(JSON.stringify({ error: "Payment initialization failed. Please try again." }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
