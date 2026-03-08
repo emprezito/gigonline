@@ -490,8 +490,8 @@ const AdminDashboard = () => {
                           <TableCell>{new Date(payout.created_at).toLocaleDateString()}</TableCell>
                           <TableCell>
                             <Badge variant={
-                              payoutStatus === "completed" ? "default" :
-                              payoutStatus === "processing" ? "secondary" :
+                              payoutStatus === "paid" ? "default" :
+                              payoutStatus === "approved" ? "secondary" :
                               payoutStatus === "failed" ? "destructive" : "outline"
                             }>
                               {payoutStatus}
