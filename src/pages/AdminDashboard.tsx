@@ -161,7 +161,7 @@ const AdminDashboard = () => {
     try {
       const { data: updatedPayout, error } = await supabase
         .from("payouts")
-        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .update({ status: "paid", completed_at: new Date().toISOString() })
         .eq("id", payoutId)
         .select("id, status, completed_at")
         .single();
