@@ -78,9 +78,9 @@ serve(async (req) => {
 
       const recipientData = await recipientRes.json();
       if (!recipientRes.ok) {
-        // Revert status
         await supabase.from("payouts").update({ status: "pending", approved_at: null }).eq("id", payoutId);
-        throw new Error(`Failed to create recipient: ${recipientData?.message || JSON.stringify(recipientData)}`);
+        console.error("Failed to create recipient:", recipientData);
+        throw new Error("Failed to create transfer recipient. Please try again.");
       }
 
       recipientCode = recipientData.data.recipient_code;
@@ -108,7 +108,8 @@ serve(async (req) => {
     const transferData = await transferRes.json();
     if (!transferRes.ok) {
       await supabase.from("payouts").update({ status: "failed" }).eq("id", payoutId);
-      throw new Error(`Transfer failed: ${transferData?.message || JSON.stringify(transferData)}`);
+      console.error("Transfer failed:", transferData);
+      throw new Error("Payout transfer failed. Please try again.");
     }
 
     // Update payout with transfer reference
@@ -126,10 +127,9 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Unknown error";
-    console.error("process-payout error:", msg);
+    console.error("process-payout error:", error);
     return new Response(
-      JSON.stringify({ success: false, error: msg }),
+      JSON.stringify({ success: false, error: "An internal error occurred. Please try again." }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
