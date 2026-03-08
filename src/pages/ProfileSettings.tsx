@@ -30,10 +30,12 @@ const ProfileSettings = () => {
 
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
 
-  if (profile && !fullName && !bio) {
+  if (profile && !fullName && !bio && !isPublic) {
     setFullName(profile.full_name || "");
     setBio(profile.bio || "");
+    setIsPublic((profile as any).is_public ?? false);
   }
 
   const updateProfile = useMutation({
