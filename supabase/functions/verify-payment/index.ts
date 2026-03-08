@@ -183,9 +183,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Unknown error";
-    console.error("verify-payment error:", msg);
-    return new Response(JSON.stringify({ error: msg }), {
+    console.error("verify-payment error:", error);
+    return new Response(JSON.stringify({ error: "Payment could not be verified. Please try again." }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
