@@ -90,20 +90,14 @@ const AffiliateDashboard = () => {
     setAccountNumber(aff.account_number || "");
     setAccountName(aff.account_name || "");
 
-    const { count } = await supabase
-      .from("referral_clicks")
-      .select("*", { count: "exact", head: true })
-      .eq("affiliate_id", aff.id);
-    setClicks(count || 0);
+    const { data: clickData } = await supabase
+      .rpc("get_affiliate_clicks", { p_affiliate_id: aff.id });
+    setClicks(clickData?.length || 0);
 
     const { data: salesData } = await supabase
-      .from("sales")
-      .select("*")
-      .eq("affiliate_id", aff.id)
-      .eq("status", "completed")
-      .order("created_at", { ascending: false });
+      .rpc("get_affiliate_sales", { p_affiliate_id: aff.id });
     setSales(salesData || []);
-    const earnings = salesData?.reduce((sum, s) => sum + (s.commission_amount || 0), 0) || 0;
+    const earnings = salesData?.reduce((sum: number, s: any) => sum + (s.commission_amount || 0), 0) || 0;
     setTotalEarnings(earnings);
 
     // Get all payouts (not just paid) to calculate available balance
