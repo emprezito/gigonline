@@ -16,22 +16,38 @@ serve(async (req) => {
     const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
     if (!PAYSTACK_SECRET_KEY) throw new Error("PAYSTACK_SECRET_KEY not configured");
 
-    const { email, amount, courseId, userId, callbackUrl, referralCode } = await req.json();
+    const { email, courseId, userId, callbackUrl, referralCode } = await req.json();
 
-    if (!email || !amount || !courseId || !userId) {
+    if (!email || !courseId || !userId) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Fetch verified course price from database — never trust client-supplied amount
+    const { data: course, error: courseError } = await supabase
+      .from("courses")
+      .select("price")
+      .eq("id", courseId)
+      .single();
+
+    if (courseError || !course) {
+      return new Response(JSON.stringify({ error: "Course not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const verifiedAmount = course.price;
+
     // Look up affiliate by referral code if provided
     let affiliateId = null;
     if (referralCode) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
       const { data: aff } = await supabase
         .from("affiliates")
         .select("id")
@@ -54,7 +70,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         email,
-        amount: Math.round(amount * 100), // kobo
+        amount: Math.round(verifiedAmount * 100), // kobo
         callback_url: callbackUrl,
         metadata,
       }),
