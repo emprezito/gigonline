@@ -18,6 +18,27 @@ serve(async (req) => {
     const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
     if (!PAYSTACK_SECRET_KEY) throw new Error("PAYSTACK_SECRET_KEY not configured");
 
+    // Authenticate the caller
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const authSupabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: caller }, error: authError } = await authSupabase.auth.getUser(token);
+    if (authError || !caller) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { reference } = await req.json();
     if (!reference) {
       return new Response(JSON.stringify({ error: "Missing reference" }), {
