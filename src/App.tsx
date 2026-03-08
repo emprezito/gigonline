@@ -16,6 +16,7 @@ import Dashboard from "./pages/Dashboard";
 import CoursePlayer from "./pages/CoursePlayer";
 import AffiliateDashboard from "./pages/AffiliateDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import { AdminRoute } from "@/components/AdminRoute";
 import ProfileSettings from "./pages/ProfileSettings";
 import NotFound from "./pages/NotFound";
 import PaymentVerify from "./pages/PaymentVerify";
