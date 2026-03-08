@@ -54,7 +54,8 @@ serve(async (req) => {
 
     const result = await res.json();
     if (!res.ok || !result.data || result.data.status !== "success") {
-      return new Response(JSON.stringify({ error: "Payment not successful", details: result }), {
+      console.error("Paystack verification failed:", result);
+      return new Response(JSON.stringify({ error: "Payment could not be verified. Please try again." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
