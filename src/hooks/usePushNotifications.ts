@@ -46,10 +46,17 @@ export function usePushNotifications() {
       const reg = await navigator.serviceWorker.register("/sw.js");
       await navigator.serviceWorker.ready;
 
-      // Get VAPID public key
-      const { data: vapidData } = await supabase.functions.invoke("send-push", {
+      // Get VAPID public key via direct fetch (supabase.functions.invoke always sends POST)
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const vapidRes = await fetch(`${supabaseUrl}/functions/v1/send-push`, {
         method: "GET",
+        headers: {
+          "apikey": supabaseAnonKey,
+          "Authorization": `Bearer ${supabaseAnonKey}`,
+        },
       });
+      const vapidData = await vapidRes.json();
 
       if (!vapidData?.publicKey) {
         console.error("Could not get VAPID public key");
