@@ -1,0 +1,21 @@
+{
+  "name": "GhostPen - Ghostwriting Income Generator",
+  "short_name": "GhostPen",
+  "description": "Learn the Art of Ghostwriting and start earning up to $500 online",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#7c3aed",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

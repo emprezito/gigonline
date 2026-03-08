@@ -42,7 +42,16 @@ export const InstallPrompt = () => {
     };
 
     window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+
+    // Fallback: show prompt after 5s even if beforeinstallprompt doesn't fire
+    const fallbackTimer = setTimeout(() => {
+      setShowPrompt(true);
+    }, 5000);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      clearTimeout(fallbackTimer);
+    };
   }, []);
 
   const handleInstall = async () => {
