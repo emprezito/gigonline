@@ -478,6 +478,8 @@ const AdminDashboard = () => {
                   <TableBody>
                     {payouts.map((payout) => {
                       const affInfo = (payout as any).affiliates;
+                      const payoutStatus = payout.status === "paid" ? "completed" : payout.status;
+
                       return (
                         <TableRow key={payout.id}>
                           <TableCell>{(payout as any).affiliate_name || "—"}</TableCell>
@@ -488,16 +490,16 @@ const AdminDashboard = () => {
                           <TableCell>{new Date(payout.created_at).toLocaleDateString()}</TableCell>
                           <TableCell>
                             <Badge variant={
-                              payout.status === "completed" ? "default" :
-                              payout.status === "processing" ? "secondary" :
-                              payout.status === "failed" ? "destructive" : "outline"
+                              payoutStatus === "completed" ? "default" :
+                              payoutStatus === "processing" ? "secondary" :
+                              payoutStatus === "failed" ? "destructive" : "outline"
                             }>
-                              {payout.status}
+                              {payoutStatus}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2 items-center">
-                              {payout.status === "pending" && (
+                              {payoutStatus === "pending" && (
                                 <>
                                   <Button
                                     size="sm"
@@ -517,7 +519,7 @@ const AdminDashboard = () => {
                                   </Button>
                                 </>
                               )}
-                              {payout.status === "processing" && (
+                              {payoutStatus === "processing" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -525,12 +527,12 @@ const AdminDashboard = () => {
                                   disabled={processingPayoutId === payout.id}
                                   className="gap-1"
                                 >
-                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  {processingPayoutId === payout.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
                                   Mark as Paid
                                 </Button>
                               )}
-                              {(payout.status === "completed" || payout.status === "failed") && (
-                                <span className="text-sm text-muted-foreground capitalize">{payout.status}</span>
+                              {(payoutStatus === "completed" || payoutStatus === "failed") && (
+                                <span className="text-sm text-muted-foreground capitalize">{payoutStatus}</span>
                               )}
                             </div>
                           </TableCell>

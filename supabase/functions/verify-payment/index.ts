@@ -78,13 +78,12 @@ serve(async (req) => {
     if (affiliate_id) {
       const { data: aff } = await supabase
         .from("affiliates")
-        .select("commission_rate, approved, enabled")
+        .select("approved, enabled")
         .eq("id", affiliate_id)
         .single();
 
       if (aff?.approved && aff?.enabled) {
-        const rate = aff.commission_rate || 30;
-        commissionAmount = Math.round((amountNaira * rate) / 100);
+        commissionAmount = Math.round((amountNaira * AFFILIATE_COMMISSION_RATE) / 100);
       }
     }
 
