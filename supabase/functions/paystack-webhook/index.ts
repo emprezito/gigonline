@@ -52,7 +52,7 @@ serve(async (req) => {
     // Validate that the paid amount matches the actual course price
     const { data: course } = await supabase
       .from("courses")
-      .select("price")
+      .select("price, title")
       .eq("id", course_id)
       .single();
 
@@ -108,6 +108,32 @@ serve(async (req) => {
 
     if (!existing || existing.length === 0) {
       await supabase.from("enrollments").insert({ user_id, course_id });
+    }
+
+    // Send notifications (fire-and-forget)
+    const notifyUrl = `${supabaseUrl}/functions/v1/send-notification`;
+    const notifyHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${supabaseServiceKey}` };
+    const { data: buyer } = await supabase.auth.admin.getUserById(user_id);
+    const courseTitle = course?.title || "Course";
+
+    fetch(notifyUrl, {
+      method: "POST",
+      headers: notifyHeaders,
+      body: JSON.stringify({
+        type: "sale_completed",
+        data: { amount: paidAmountNaira, courseTitle, buyerEmail: buyer?.user?.email || "", affiliateId: affiliate_id || null },
+      }),
+    }).catch(console.error);
+
+    if (affiliate_id && commissionAmount > 0) {
+      fetch(notifyUrl, {
+        method: "POST",
+        headers: notifyHeaders,
+        body: JSON.stringify({
+          type: "affiliate_sale",
+          data: { affiliateId: affiliate_id, amount: paidAmountNaira, commission: commissionAmount, courseTitle },
+        }),
+      }).catch(console.error);
     }
 
     return new Response("OK", { status: 200 });

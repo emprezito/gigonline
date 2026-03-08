@@ -138,6 +138,7 @@ const AdminDashboard = () => {
   const approvePayout = async (payoutId: string) => {
     setProcessingPayoutId(payoutId);
     try {
+      const payout = payouts.find((p) => p.id === payoutId);
       const { data: updatedPayout, error } = await supabase
         .from("payouts")
         .update({ status: "approved", approved_at: new Date().toISOString() })
@@ -149,6 +150,11 @@ const AdminDashboard = () => {
 
       setPayouts((prev) => prev.map((p) => (p.id === payoutId ? { ...p, ...updatedPayout } : p)));
       toast({ title: "Payout approved", description: "Transfer the funds manually, then mark as paid." });
+
+      // Notify affiliate
+      supabase.functions.invoke("send-notification", {
+        body: { type: "payout_approved", data: { affiliateId: payout?.affiliate_id, amount: payout?.amount } },
+      }).catch(console.error);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -159,6 +165,7 @@ const AdminDashboard = () => {
   const markPayoutCompleted = async (payoutId: string) => {
     setProcessingPayoutId(payoutId);
     try {
+      const payout = payouts.find((p) => p.id === payoutId);
       const { data: updatedPayout, error } = await supabase
         .from("payouts")
         .update({ status: "paid", completed_at: new Date().toISOString() })
@@ -170,6 +177,11 @@ const AdminDashboard = () => {
 
       setPayouts((prev) => prev.map((p) => (p.id === payoutId ? { ...p, ...updatedPayout } : p)));
       toast({ title: "Payout marked as paid" });
+
+      // Notify affiliate
+      supabase.functions.invoke("send-notification", {
+        body: { type: "payout_paid", data: { affiliateId: payout?.affiliate_id, amount: payout?.amount } },
+      }).catch(console.error);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
