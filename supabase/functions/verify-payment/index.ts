@@ -54,7 +54,8 @@ serve(async (req) => {
 
     const result = await res.json();
     if (!res.ok || !result.data || result.data.status !== "success") {
-      return new Response(JSON.stringify({ error: "Payment not successful", details: result }), {
+      console.error("Paystack verification failed:", result);
+      return new Response(JSON.stringify({ error: "Payment could not be verified. Please try again." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -182,9 +183,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Unknown error";
-    console.error("verify-payment error:", msg);
-    return new Response(JSON.stringify({ error: msg }), {
+    console.error("verify-payment error:", error);
+    return new Response(JSON.stringify({ error: "Payment could not be verified. Please try again." }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
