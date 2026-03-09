@@ -43,6 +43,7 @@ const AdminDashboard = () => {
   const [courseForm, setCourseForm] = useState({ title: "", description: "", price: 49999, commission_rate: 50, published: false });
   const [moduleForm, setModuleForm] = useState({ course_id: "", title: "", sort_order: 0 });
   const [lessonForm, setLessonForm] = useState({ module_id: "", title: "", type: "video", video_url: "", description: "", sort_order: 0 });
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [editingCourse, setEditingCourse] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState<string | null>(null);
 
