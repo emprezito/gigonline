@@ -280,6 +280,15 @@ const CoursePlayer = () => {
                   />
                 </div>
               )}
+              {activeLesson.type === "pdf" && activeLesson.video_url && (
+                <div className="overflow-hidden rounded-lg border bg-muted" style={{ height: "80vh" }}>
+                  <iframe
+                    src={activeLesson.video_url}
+                    className="h-full w-full"
+                    title={activeLesson.title}
+                  />
+                </div>
+              )}
               <div className="mt-4 sm:mt-6">
                 <div className="flex items-start justify-between gap-4">
                   <h1 className="font-display text-xl sm:text-2xl font-bold">{activeLesson.title}</h1>
