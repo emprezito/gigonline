@@ -13,7 +13,11 @@ interface NotificationPayload {
     | "payout_requested"
     | "payout_approved"
     | "payout_paid"
-    | "affiliate_sale";
+    | "affiliate_sale"
+    | "enrollment_confirmed"
+    | "course_completed"
+    | "affiliate_approved"
+    | "new_user_signup";
   data: Record<string, unknown>;
 }
 
@@ -76,11 +80,9 @@ serve(async (req) => {
     const authHeader = req.headers.get("authorization") ?? "";
     const token = authHeader.replace(/^Bearer\s+/i, "");
 
-    // If the token IS the service role key, allow (internal server-to-server call)
     const isServiceRole = token === supabaseServiceKey;
 
     if (!isServiceRole) {
-      // Otherwise validate as a user JWT and check admin role
       const { data: { user: caller }, error: authError } = await supabase.auth.getUser(token);
       if (authError || !caller) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -145,6 +147,12 @@ serve(async (req) => {
       return { email: userData?.user?.email ?? null, userId: aff.user_id };
     };
 
+    // Helper to get user info by ID
+    const getUserInfo = async (userId: string): Promise<{ email: string | null }> => {
+      const { data: userData } = await supabase.auth.admin.getUserById(userId);
+      return { email: userData?.user?.email ?? null };
+    };
+
     switch (type) {
       case "sale_completed": {
         const { amount, courseTitle, buyerEmail, affiliateId } = data as {
@@ -172,6 +180,69 @@ serve(async (req) => {
         break;
       }
 
+      case "enrollment_confirmed": {
+        const { userId, courseTitle, courseId } = data as {
+          userId: string;
+          courseTitle: string;
+          courseId: string;
+        };
+
+        const { email } = await getUserInfo(userId);
+        if (email) {
+          await sendEmail(
+            email,
+            `🎓 You're Enrolled — ${courseTitle}`,
+            emailTemplate(
+              "Welcome to Your New Course!",
+              `<p>You've been successfully enrolled in <strong>${courseTitle}</strong>.</p>
+               <p>Head to your dashboard to start learning right away! 🚀</p>
+               <p>We're excited to have you on this journey.</p>`
+            )
+          );
+        }
+        await sendPush([userId], "🎓 Enrollment Confirmed!", `You're now enrolled in ${courseTitle}. Start learning!`, `/course/${courseId}`);
+        break;
+      }
+
+      case "course_completed": {
+        const { userId, courseTitle, userName } = data as {
+          userId: string;
+          courseTitle: string;
+          userName: string;
+        };
+
+        const { email } = await getUserInfo(userId);
+        if (email) {
+          await sendEmail(
+            email,
+            `🏆 Congratulations — You Completed ${courseTitle}!`,
+            emailTemplate(
+              "Course Completed!",
+              `<p>Congratulations, <strong>${userName}</strong>! 🎉</p>
+               <p>You've completed all lessons in <strong>${courseTitle}</strong>.</p>
+               <p>Your certificate is now available for download in the course player.</p>
+               <p>Keep up the amazing work! 🚀</p>`
+            )
+          );
+        }
+        await sendPush([userId], "🏆 Course Completed!", `Congratulations! You finished ${courseTitle}. Download your certificate!`, "/dashboard");
+
+        // Also notify admins
+        const { emails: adminEmails, userIds: adminUserIds } = await getAdminInfo();
+        for (const adminEmail of adminEmails) {
+          await sendEmail(
+            adminEmail,
+            `🎓 Student Completed ${courseTitle}`,
+            emailTemplate(
+              "Student Course Completion",
+              `<p><strong>${userName}</strong> has completed all lessons in <strong>${courseTitle}</strong>.</p>`
+            )
+          );
+        }
+        await sendPush(adminUserIds, "🎓 Course Completed", `${userName} finished ${courseTitle}`, "/admin");
+        break;
+      }
+
       case "affiliate_sale": {
         const { affiliateId, amount, commission, courseTitle } = data as {
           affiliateId: string;
@@ -195,6 +266,26 @@ serve(async (req) => {
           );
         }
         if (userId) await sendPush([userId], "🎉 Commission Earned!", `You earned ${formatCurrency(commission)} from a referral sale`, "/affiliate");
+        break;
+      }
+
+      case "affiliate_approved": {
+        const { affiliateId } = data as { affiliateId: string };
+
+        const { email, userId } = await getAffiliateInfo(affiliateId);
+        if (email) {
+          await sendEmail(
+            email,
+            `✅ Your Affiliate Account is Approved!`,
+            emailTemplate(
+              "You're Approved!",
+              `<p>Great news! Your affiliate account has been approved. 🎉</p>
+               <p>You can now start sharing your referral link and earning commissions on every sale.</p>
+               <p>Visit your Affiliate Dashboard to get started!</p>`
+            )
+          );
+        }
+        if (userId) await sendPush([userId], "✅ Affiliate Approved!", "Your affiliate account is now active. Start earning!", "/affiliate");
         break;
       }
 
@@ -263,6 +354,46 @@ serve(async (req) => {
           );
         }
         if (userId) await sendPush([userId], "💸 Payout Sent!", `${formatCurrency(amount)} has been transferred to your bank`, "/affiliate");
+        break;
+      }
+
+      case "new_user_signup": {
+        const { userId, userName, userEmail } = data as {
+          userId: string;
+          userName: string;
+          userEmail: string;
+        };
+
+        // Notify admins about new user
+        const { emails: adminEmails, userIds: adminUserIds } = await getAdminInfo();
+        for (const email of adminEmails) {
+          await sendEmail(
+            email,
+            `👤 New User Signup — ${userName || userEmail}`,
+            emailTemplate(
+              "New User Registered!",
+              `<p><strong>Name:</strong> ${userName || "Not provided"}</p>
+               <p><strong>Email:</strong> ${userEmail}</p>
+               <p>A new user has joined the platform.</p>`
+            )
+          );
+        }
+        await sendPush(adminUserIds, "👤 New User", `${userName || userEmail} just signed up!`, "/admin");
+
+        // Welcome email to user
+        if (userEmail) {
+          await sendEmail(
+            userEmail,
+            `🎉 Welcome to GhostPen!`,
+            emailTemplate(
+              "Welcome to GhostPen!",
+              `<p>Hi ${userName || "there"}! 👋</p>
+               <p>Welcome to GhostPen — your journey to ghostwriting mastery starts now.</p>
+               <p>Explore our courses and start learning today. If you have any questions, we're here to help!</p>
+               <p>Happy learning! 🚀</p>`
+            )
+          );
+        }
         break;
       }
     }
