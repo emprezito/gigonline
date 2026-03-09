@@ -134,6 +134,13 @@ const AdminDashboard = () => {
     await supabase.from("affiliates").update({ [field]: value }).eq("id", id);
     fetchAllData();
     toast({ title: "Affiliate updated" });
+
+    // If approving an affiliate, send them a notification
+    if (field === "approved" && value === true) {
+      supabase.functions.invoke("send-notification", {
+        body: { type: "affiliate_approved", data: { affiliateId: id } },
+      }).catch(console.error);
+    }
   };
 
   const approvePayout = async (payoutId: string) => {

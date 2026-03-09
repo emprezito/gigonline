@@ -133,6 +133,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     if (error) throw error;
 
+    // Send welcome / new user signup notification (fire-and-forget)
+    if (data.user) {
+      supabase.functions.invoke("send-notification", {
+        body: {
+          type: "new_user_signup",
+          data: {
+            userId: data.user.id,
+            userName: normalizedFullName,
+            userEmail: normalizedEmail,
+          },
+        },
+      }).catch(console.error);
+    }
+
     // Keep sign-up fast and finish affiliate setup in the background for auto-confirmed users.
     if (isAffiliate && data.user && data.session) {
       void (async () => {

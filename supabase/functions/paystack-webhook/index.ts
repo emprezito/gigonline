@@ -125,6 +125,16 @@ serve(async (req) => {
       }),
     }).catch(console.error);
 
+    // Notify student about enrollment
+    fetch(notifyUrl, {
+      method: "POST",
+      headers: notifyHeaders,
+      body: JSON.stringify({
+        type: "enrollment_confirmed",
+        data: { userId: user_id, courseTitle, courseId: course_id },
+      }),
+    }).catch(console.error);
+
     if (affiliate_id && commissionAmount > 0) {
       fetch(notifyUrl, {
         method: "POST",
