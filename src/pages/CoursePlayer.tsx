@@ -142,8 +142,23 @@ const CoursePlayer = () => {
       setCompletedLessons((prev) => { const s = new Set(prev); s.delete(lessonId); return s; });
     } else {
       await supabase.from("lesson_progress").upsert({ user_id: user!.id, lesson_id: lessonId, completed: true, completed_at: new Date().toISOString() });
-      setCompletedLessons((prev) => new Set(prev).add(lessonId));
+      const newCompleted = new Set(completedLessons).add(lessonId);
+      setCompletedLessons(newCompleted);
       toast({ title: "Lesson completed! 🎉" });
+
+      // Check if all lessons are now completed → trigger course_completed notification
+      if (newCompleted.size === totalLessons && totalLessons > 0) {
+        supabase.functions.invoke("send-notification", {
+          body: {
+            type: "course_completed",
+            data: {
+              userId: user!.id,
+              courseTitle,
+              userName: user!.user_metadata?.full_name || "Student",
+            },
+          },
+        }).catch(console.error);
+      }
     }
   };
 
