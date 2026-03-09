@@ -124,6 +124,23 @@ const AdminDashboard = () => {
     toast({ title: "Module created" });
   };
 
+  const handleFileUpload = async (file: File) => {
+    setUploadingFile(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const filePath = `${crypto.randomUUID()}.${fileExt}`;
+      const { error } = await supabase.storage.from("lesson-files").upload(filePath, file);
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("lesson-files").getPublicUrl(filePath);
+      setLessonForm((prev) => ({ ...prev, video_url: urlData.publicUrl }));
+      toast({ title: "File uploaded successfully" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
   const saveLesson = async () => {
     await supabase.from("lessons").insert(lessonForm);
     setDialogOpen(null);
