@@ -14,7 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Plus, Pencil, Trash2, DollarSign, Users, BookOpen, TrendingUp, ArrowUpDown, Loader2, CheckCircle, XCircle, Settings, Bell } from "lucide-react";
+import { Plus, Pencil, Trash2, DollarSign, Users, BookOpen, TrendingUp, ArrowUpDown, Loader2, CheckCircle, XCircle, Settings, Bell, Upload } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
 const AdminDashboard = () => {
@@ -42,6 +43,7 @@ const AdminDashboard = () => {
   const [courseForm, setCourseForm] = useState({ title: "", description: "", price: 49999, commission_rate: 50, published: false });
   const [moduleForm, setModuleForm] = useState({ course_id: "", title: "", sort_order: 0 });
   const [lessonForm, setLessonForm] = useState({ module_id: "", title: "", type: "video", video_url: "", description: "", sort_order: 0 });
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [editingCourse, setEditingCourse] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState<string | null>(null);
 
@@ -120,6 +122,23 @@ const AdminDashboard = () => {
     setModuleForm({ course_id: "", title: "", sort_order: 0 });
     if (editingCourse) fetchModulesForCourse(editingCourse);
     toast({ title: "Module created" });
+  };
+
+  const handleFileUpload = async (file: File) => {
+    setUploadingFile(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const filePath = `${crypto.randomUUID()}.${fileExt}`;
+      const { error } = await supabase.storage.from("lesson-files").upload(filePath, file);
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("lesson-files").getPublicUrl(filePath);
+      setLessonForm((prev) => ({ ...prev, video_url: urlData.publicUrl }));
+      toast({ title: "File uploaded successfully" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingFile(false);
+    }
   };
 
   const saveLesson = async () => {
@@ -385,9 +404,42 @@ const AdminDashboard = () => {
                       </div>
                       <div className="mt-3 space-y-2 border-t pt-3">
                         <Input placeholder="Lesson title" onChange={(e) => setLessonForm({ ...lessonForm, module_id: mod.id, title: e.target.value })} />
-                        <Input placeholder="Video URL" onChange={(e) => setLessonForm({ ...lessonForm, video_url: e.target.value })} />
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Lesson Type</Label>
+                          <Select value={lessonForm.type} onValueChange={(v) => setLessonForm({ ...lessonForm, type: v, video_url: "" })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="video">Video</SelectItem>
+                              <SelectItem value="pdf">PDF Document</SelectItem>
+                              <SelectItem value="text">Text Only</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {lessonForm.type === "video" && (
+                          <Input placeholder="Video URL (YouTube/Vimeo)" onChange={(e) => setLessonForm({ ...lessonForm, video_url: e.target.value })} />
+                        )}
+                        {lessonForm.type === "pdf" && (
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Upload PDF</Label>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="file"
+                                accept=".pdf"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleFileUpload(file);
+                                }}
+                                disabled={uploadingFile}
+                              />
+                              {uploadingFile && <Loader2 className="h-4 w-4 animate-spin" />}
+                            </div>
+                            {lessonForm.video_url && (
+                              <p className="text-xs text-muted-foreground truncate">✓ Uploaded: {lessonForm.video_url.split("/").pop()}</p>
+                            )}
+                          </div>
+                        )}
                         <Textarea placeholder="Description" onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })} />
-                        <Button size="sm" onClick={saveLesson}>Add Lesson</Button>
+                        <Button size="sm" onClick={saveLesson} disabled={uploadingFile}>Add Lesson</Button>
                       </div>
                     </div>
                   ))}
