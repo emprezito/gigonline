@@ -480,6 +480,43 @@ const AdminDashboard = () => {
                 </div>
               </DialogContent>
             </Dialog>
+
+            {/* Edit Lesson Dialog */}
+            <Dialog open={dialogOpen === "edit-lesson"} onOpenChange={(open) => { setDialogOpen(open ? "edit-lesson" : null); if (!open) { setEditingLesson(null); setLessonForm({ module_id: "", title: "", type: "video", video_url: "", description: "", sort_order: 0 }); } }}>
+              <DialogContent>
+                <DialogHeader><DialogTitle className="font-display">Edit Lesson</DialogTitle></DialogHeader>
+                <div className="space-y-4">
+                  <div><Label>Title</Label><Input value={lessonForm.title} onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })} /></div>
+                  <div>
+                    <Label>Lesson Type</Label>
+                    <Select value={lessonForm.type} onValueChange={(v) => setLessonForm({ ...lessonForm, type: v, video_url: "" })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="video">Video</SelectItem>
+                        <SelectItem value="pdf">PDF Document</SelectItem>
+                        <SelectItem value="text">Text Only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {lessonForm.type === "video" && (
+                    <div><Label>Video URL</Label><Input value={lessonForm.video_url} onChange={(e) => setLessonForm({ ...lessonForm, video_url: e.target.value })} /></div>
+                  )}
+                  {lessonForm.type === "pdf" && (
+                    <div className="space-y-2">
+                      <Label>Upload PDF</Label>
+                      <div className="flex items-center gap-2">
+                        <Input type="file" accept=".pdf" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileUpload(file); }} disabled={uploadingFile} />
+                        {uploadingFile && <Loader2 className="h-4 w-4 animate-spin" />}
+                      </div>
+                      {lessonForm.video_url && <p className="text-xs text-muted-foreground truncate">✓ File: {lessonForm.video_url.split("/").pop()}</p>}
+                    </div>
+                  )}
+                  <div><Label>Description</Label><Textarea value={lessonForm.description} onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })} /></div>
+                  <div><Label>Sort Order</Label><Input type="number" value={lessonForm.sort_order} onChange={(e) => setLessonForm({ ...lessonForm, sort_order: Number(e.target.value) })} /></div>
+                  <Button onClick={saveLesson} className="w-full" disabled={uploadingFile}>Save Changes</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* Affiliates */}
