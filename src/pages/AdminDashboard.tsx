@@ -143,11 +143,29 @@ const AdminDashboard = () => {
   };
 
   const saveLesson = async () => {
-    await supabase.from("lessons").insert(lessonForm);
+    if (editingLesson) {
+      await supabase.from("lessons").update({
+        title: lessonForm.title,
+        type: lessonForm.type,
+        video_url: lessonForm.video_url,
+        description: lessonForm.description,
+        sort_order: lessonForm.sort_order,
+      }).eq("id", editingLesson);
+      toast({ title: "Lesson updated" });
+    } else {
+      await supabase.from("lessons").insert(lessonForm);
+      toast({ title: "Lesson created" });
+    }
     setDialogOpen(null);
+    setEditingLesson(null);
     setLessonForm({ module_id: "", title: "", type: "video", video_url: "", description: "", sort_order: 0 });
     if (editingCourse) fetchModulesForCourse(editingCourse);
-    toast({ title: "Lesson created" });
+  };
+
+  const deleteLesson = async (lessonId: string) => {
+    await supabase.from("lessons").delete().eq("id", lessonId);
+    if (editingCourse) fetchModulesForCourse(editingCourse);
+    toast({ title: "Lesson deleted" });
   };
 
   const toggleAffiliate = async (id: string, field: string, value: boolean) => {
