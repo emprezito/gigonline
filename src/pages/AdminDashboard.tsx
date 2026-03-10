@@ -45,6 +45,7 @@ const AdminDashboard = () => {
   const [lessonForm, setLessonForm] = useState({ module_id: "", title: "", type: "video", video_url: "", description: "", sort_order: 0 });
   const [uploadingFile, setUploadingFile] = useState(false);
   const [editingCourse, setEditingCourse] = useState<string | null>(null);
+  const [editingLesson, setEditingLesson] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState<string | null>(null);
 
   useEffect(() => {
