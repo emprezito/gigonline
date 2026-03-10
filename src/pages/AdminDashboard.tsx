@@ -417,7 +417,22 @@ const AdminDashboard = () => {
                         {lessons.filter((l) => l.module_id === mod.id).map((lesson) => (
                           <div key={lesson.id} className="flex items-center justify-between rounded bg-muted p-2 text-sm">
                             <span>{lesson.title}</span>
-                            <Badge variant="outline">{lesson.type}</Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{lesson.type}</Badge>
+                              <Button variant="ghost" size="sm" onClick={() => {
+                                setEditingLesson(lesson.id);
+                                setLessonForm({
+                                  module_id: lesson.module_id,
+                                  title: lesson.title,
+                                  type: lesson.type,
+                                  video_url: lesson.video_url || "",
+                                  description: lesson.description || "",
+                                  sort_order: lesson.sort_order,
+                                });
+                                setDialogOpen("edit-lesson");
+                              }}><Pencil className="h-3.5 w-3.5" /></Button>
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => deleteLesson(lesson.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                            </div>
                           </div>
                         ))}
                       </div>
