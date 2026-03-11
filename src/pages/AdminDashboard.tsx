@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Plus, Pencil, Trash2, DollarSign, Users, BookOpen, TrendingUp, ArrowUpDown, Loader2, CheckCircle, XCircle, Settings, Bell, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, DollarSign, Users, BookOpen, TrendingUp, ArrowUpDown, Loader2, CheckCircle, XCircle, Settings, Bell, Upload, Image, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
@@ -38,6 +38,8 @@ const AdminDashboard = () => {
   const [sendingTestNotif, setSendingTestNotif] = useState(false);
   const [platformUsers, setPlatformUsers] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [testimonials, setTestimonials] = useState<any[]>([]);
+  const [uploadingTestimonial, setUploadingTestimonial] = useState(false);
 
   // Form states
   const [courseForm, setCourseForm] = useState({ title: "", description: "", price: 49999, commission_rate: 50, published: false });
@@ -49,8 +51,47 @@ const AdminDashboard = () => {
   const [dialogOpen, setDialogOpen] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && hasRole("admin")) fetchAllData();
+    if (user && hasRole("admin")) {
+      fetchAllData();
+      fetchTestimonials();
+    }
   }, [user, authLoading]);
+
+  const fetchTestimonials = async () => {
+    const { data } = await supabase.from("testimonial_screenshots").select("*").order("sort_order");
+    setTestimonials(data || []);
+  };
+
+  const handleTestimonialUpload = async (file: File) => {
+    setUploadingTestimonial(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const filePath = `${crypto.randomUUID()}.${fileExt}`;
+      const { error } = await supabase.storage.from("testimonials").upload(filePath, file);
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("testimonials").getPublicUrl(filePath);
+      const maxOrder = testimonials.length > 0 ? Math.max(...testimonials.map((t: any) => t.sort_order)) + 1 : 0;
+      await supabase.from("testimonial_screenshots").insert({ image_url: urlData.publicUrl, sort_order: maxOrder });
+      fetchTestimonials();
+      toast({ title: "Testimonial uploaded" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingTestimonial(false);
+    }
+  };
+
+  const deleteTestimonial = async (id: string, imageUrl: string) => {
+    try {
+      const fileName = imageUrl.split("/").pop();
+      if (fileName) await supabase.storage.from("testimonials").remove([fileName]);
+      await supabase.from("testimonial_screenshots").delete().eq("id", id);
+      fetchTestimonials();
+      toast({ title: "Testimonial deleted" });
+    } catch (err: any) {
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    }
+  };
 
   const fetchAllData = async () => {
     const [coursesRes, affiliatesRes, salesRes, payoutsRes, settingsRes] = await Promise.all([
@@ -765,6 +806,50 @@ const AdminDashboard = () => {
                 )}
                 {platformUsers.length > 0 && (
                   <p className="mt-4 text-sm text-muted-foreground">{platformUsers.length} total users</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="font-display flex items-center gap-2"><Image className="h-5 w-5" /> Testimonial Screenshots</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">Upload screenshots of student testimonials to display on the landing page.</p>
+                <div>
+                  <Label htmlFor="testimonial-upload" className="cursor-pointer">
+                    <div className="flex items-center gap-2 rounded-md border border-dashed border-muted-foreground/30 p-4 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors">
+                      {uploadingTestimonial ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      {uploadingTestimonial ? "Uploading..." : "Click to upload a testimonial screenshot"}
+                    </div>
+                  </Label>
+                  <input
+                    id="testimonial-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleTestimonialUpload(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+                {testimonials.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {testimonials.map((t: any) => (
+                      <div key={t.id} className="relative group rounded-lg overflow-hidden border">
+                        <img src={t.image_url} alt="Testimonial" className="w-full h-auto object-cover" />
+                        <button
+                          onClick={() => deleteTestimonial(t.id, t.image_url)}
+                          className="absolute top-1 right-1 rounded-full bg-destructive p-1 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {testimonials.length === 0 && (
+                  <p className="text-sm text-muted-foreground italic">No testimonials uploaded yet.</p>
                 )}
               </CardContent>
             </Card>

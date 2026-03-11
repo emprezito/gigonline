@@ -466,6 +466,27 @@ export type Database = {
           },
         ]
       }
+      testimonial_screenshots: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       usage_tracking: {
         Row: {
           action_type: string

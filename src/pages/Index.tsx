@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -5,8 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
-import { BookOpen, Users, DollarSign, CheckCircle, Star, Play, ArrowRight, Zap, Target, TrendingUp } from "lucide-react";
+import { BookOpen, CheckCircle, Star, Play, ArrowRight, Zap, Target, TrendingUp, Flame, Crown, Moon } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const fadeIn = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } };
 
@@ -25,24 +28,31 @@ const modules = [
   },
 ];
 
-const testimonials = [
-  { name: "Sarah K.", role: "Freelance Writer", text: "This course transformed my freelance career. I went from $500 to $5,000/month in 3 months.", avatar: "SK" },
-  { name: "James O.", role: "Content Strategist", text: "The modules on client acquisition alone were worth 10x the price. Incredibly actionable.", avatar: "JO" },
-  { name: "Amara D.", role: "Ghostwriter", text: "I landed my first $2,000 ghostwriting gig within 2 weeks of completing Module 2.", avatar: "AD" },
-];
-
 const faqs = [
-  { q: "Who is this course for?", a: "Anyone who wants to build a profitable ghostwriting career — whether you're a complete beginner or an experienced writer looking to scale." },
+  { q: "Who is this course for?", a: "Anyone who wants to earn money writing novels on platforms like GoodNovel, LetterLux, Novellair, and more — whether you're a complete beginner or an experienced writer looking to break into web novel ghostwriting." },
+  { q: "Do I need writing experience?", a: "Not at all! The course starts from the basics and walks you through everything — from understanding popular tropes to writing your first chapter. Many of our successful students started with zero experience." },
+  { q: "What genres does this course cover?", a: "We focus on the highest-paying web novel genres: Dark Romance, Billionaire Romance, Werewolf/Supernatural, Mafia, and more. You'll learn the tropes, structures, and hooks that readers on these platforms love." },
   { q: "How long do I have access?", a: "Lifetime access. Once you enroll, you can revisit the materials anytime, including future updates." },
   { q: "Is there a money-back guarantee?", a: "Yes! We offer a 30-day money-back guarantee. If you're not satisfied, we'll refund you in full." },
-  { q: "Can I become an affiliate?", a: "Absolutely! Sign up as an affiliate and earn 30% commission on every sale you refer. We provide marketing materials and tracking." },
-  { q: "What format are the lessons?", a: "A mix of video lessons, written guides, and downloadable templates/resources you can use with clients." },
+  { q: "What format are the lessons?", a: "A mix of video lessons, written guides, and downloadable templates/resources you can use immediately." },
 ];
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const affiliateLink = user ? "/settings" : "/signup?affiliate=true";
+  const [testimonials, setTestimonials] = useState<{ id: string; image_url: string }[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchTestimonials = async () => {
+      const { data } = await supabase
+        .from("testimonial_screenshots")
+        .select("id, image_url")
+        .order("sort_order");
+      setTestimonials(data || []);
+    };
+    fetchTestimonials();
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -61,42 +71,68 @@ const Index = () => {
           >
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-background/80 px-4 py-1.5 text-sm backdrop-blur">
               <Zap className="h-4 w-4 text-primary" />
-              <span>Join 2,000+ students already enrolled</span>
+              <span>Write for GoodNovel, LetterLux & more</span>
             </div>
             <h1 className="font-display text-4xl font-bold tracking-tight md:text-6xl lg:text-7xl">
-              Master the Art of{" "}
+              Get Paid to Write{" "}
               <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                Ghostwriting
+                Web Novels
               </span>
             </h1>
             <p className="mt-6 text-lg text-muted-foreground md:text-xl">
-              Learn how to build a 6-figure ghostwriting business from scratch. Get clients, deliver exceptional work, and scale your income.
+              Learn how to ghostwrite Dark Romance, Billionaire, Werewolf & Supernatural novels for platforms like GoodNovel, LetterLux, Novellair — and start earning ₦100k+ monthly.
             </p>
             <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Button size="lg" className="gap-2 text-base" onClick={() => navigate("/signup")}>
                 Enroll Now — ₦20,000
                 <ArrowRight className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="lg" className="gap-2 text-base" onClick={() => navigate(affiliateLink)}>
-                Become an Affiliate
-              </Button>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* What You'll Learn */}
+      {/* Popular Genres */}
       <section className="border-t bg-muted/30 py-20">
         <div className="container mx-auto px-4">
           <motion.div className="text-center" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
-            <h2 className="font-display text-3xl font-bold md:text-4xl">What You'll Learn</h2>
-            <p className="mt-3 text-muted-foreground">Everything you need to become a top-tier ghostwriter</p>
+            <h2 className="font-display text-3xl font-bold md:text-4xl">Write What Readers Crave</h2>
+            <p className="mt-3 text-muted-foreground">Master the most profitable genres on web novel platforms</p>
           </motion.div>
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             {[
-              { icon: Target, title: "Find Premium Clients", desc: "Learn proven strategies to attract high-paying clients consistently." },
-              { icon: BookOpen, title: "Write Compelling Content", desc: "Master voice-matching and high-converting writing techniques." },
-              { icon: TrendingUp, title: "Scale to 6 Figures", desc: "Build systems to grow from freelancer to business owner." },
+              { icon: Flame, title: "Dark Romance & Mafia", desc: "Rejected mates, contract marriages, forbidden love, mafia bosses — write the tropes that keep readers binge-reading all night." },
+              { icon: Crown, title: "Billionaire Romance", desc: "CEO romances, secret babies, sold brides — learn how to craft irresistible billionaire stories that dominate the charts." },
+              { icon: Moon, title: "Werewolf & Supernatural", desc: "Alpha mates, vampire kings, second-chance bonds — tap into the massive werewolf and supernatural fanbase." },
+            ].map((item, i) => (
+              <motion.div key={i} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn} transition={{ delay: i * 0.15 }}>
+                <Card className="h-full border-0 bg-background shadow-md transition-shadow hover:shadow-lg">
+                  <CardContent className="p-6">
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-accent">
+                      <item.icon className="h-6 w-6 text-accent-foreground" />
+                    </div>
+                    <h3 className="font-display text-lg font-semibold">{item.title}</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">{item.desc}</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* What You'll Learn */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <motion.div className="text-center" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
+            <h2 className="font-display text-3xl font-bold md:text-4xl">What You'll Learn</h2>
+            <p className="mt-3 text-muted-foreground">Everything you need to start earning as a web novel ghostwriter</p>
+          </motion.div>
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            {[
+              { icon: Target, title: "Find Ghostwriting Gigs", desc: "Learn exactly how to land writing contracts on GoodNovel, LetterLux, Novellair, and other platforms." },
+              { icon: BookOpen, title: "Write Addictive Stories", desc: "Master cliffhangers, tropes, pacing, and hooks that keep readers coming back for more chapters." },
+              { icon: TrendingUp, title: "Scale to ₦100k+/Month", desc: "Build a system to write consistently, manage multiple projects, and grow your ghostwriting income." },
             ].map((item, i) => (
               <motion.div key={i} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn} transition={{ delay: i * 0.15 }}>
                 <Card className="h-full border-0 bg-background shadow-md transition-shadow hover:shadow-lg">
@@ -115,7 +151,7 @@ const Index = () => {
       </section>
 
       {/* Modules Preview */}
-      <section id="modules" className="py-20">
+      <section id="modules" className="border-t bg-muted/30 py-20">
         <div className="container mx-auto px-4">
           <motion.div className="text-center" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
             <h2 className="font-display text-3xl font-bold md:text-4xl">Course Modules</h2>
@@ -148,42 +184,46 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="border-t bg-muted/30 py-20">
-        <div className="container mx-auto px-4">
-          <motion.div className="text-center" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
-            <h2 className="font-display text-3xl font-bold md:text-4xl">What Our Students Say</h2>
-          </motion.div>
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {testimonials.map((t, i) => (
-              <motion.div key={i} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn} transition={{ delay: i * 0.15 }}>
-                <Card className="h-full">
-                  <CardContent className="p-6">
-                    <div className="mb-3 flex gap-1">
-                      {[...Array(5)].map((_, j) => (
-                        <Star key={j} className="h-4 w-4 fill-primary text-primary" />
-                      ))}
-                    </div>
-                    <p className="text-sm text-muted-foreground">"{t.text}"</p>
-                    <div className="mt-4 flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                        {t.avatar}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold">{t.name}</p>
-                        <p className="text-xs text-muted-foreground">{t.role}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+      {/* Testimonials - Screenshot Gallery */}
+      {testimonials.length > 0 && (
+        <section className="py-20">
+          <div className="container mx-auto px-4">
+            <motion.div className="text-center" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
+              <h2 className="font-display text-3xl font-bold md:text-4xl">What Our Students Say</h2>
+              <p className="mt-3 text-muted-foreground">Real results from real students</p>
+            </motion.div>
+            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {testimonials.map((t, i) => (
+                <motion.div key={t.id} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn} transition={{ delay: i * 0.1 }}>
+                  <Card
+                    className="overflow-hidden cursor-pointer transition-transform hover:scale-[1.02]"
+                    onClick={() => setSelectedImage(t.image_url)}
+                  >
+                    <img
+                      src={t.image_url}
+                      alt={`Student testimonial ${i + 1}`}
+                      className="w-full h-auto object-cover"
+                      loading="lazy"
+                    />
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+
+          {/* Lightbox */}
+          <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+            <DialogContent className="max-w-3xl p-2">
+              {selectedImage && (
+                <img src={selectedImage} alt="Testimonial" className="w-full h-auto rounded-lg" />
+              )}
+            </DialogContent>
+          </Dialog>
+        </section>
+      )}
 
       {/* Instructor */}
-      <section className="py-20">
+      <section className="border-t bg-muted/30 py-20">
         <div className="container mx-auto px-4">
           <div className="mx-auto flex max-w-3xl flex-col items-center gap-8 md:flex-row">
             <div className="flex h-32 w-32 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/60 text-3xl font-bold text-primary-foreground">
@@ -192,8 +232,8 @@ const Index = () => {
             <div>
               <h2 className="font-display text-2xl font-bold">Meet Your Instructor</h2>
               <p className="mt-3 text-muted-foreground">
-                A seasoned ghostwriter with 10+ years of experience, having written for Fortune 500 executives, bestselling authors, and top-tier publications. 
-                This course distills a decade of real-world expertise into actionable lessons you can apply immediately.
+                A professional ghostwriter who has written 50+ novels across Dark Romance, Billionaire, and Werewolf genres for top web novel platforms. 
+                This course distills real-world experience into actionable lessons so you can start earning from your writing.
               </p>
             </div>
           </div>
@@ -201,7 +241,7 @@ const Index = () => {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="border-t bg-muted/30 py-20">
+      <section id="pricing" className="py-20">
         <div className="container mx-auto px-4">
           <motion.div className="text-center" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
             <h2 className="font-display text-3xl font-bold md:text-4xl">Simple Pricing</h2>
@@ -217,7 +257,15 @@ const Index = () => {
                   <span className="text-muted-foreground"> / one-time</span>
                 </div>
                 <ul className="mt-6 space-y-3 text-left text-sm">
-                  {["12 in-depth video lessons", "Downloadable templates & resources", "Lifetime access + updates", "Private community access", "Certificate of completion", "30-day money-back guarantee"].map((item, i) => (
+                  {[
+                    "12 in-depth video lessons",
+                    "Learn Dark Romance, Billionaire & Werewolf genres",
+                    "Platform-specific strategies for GoodNovel & LetterLux",
+                    "Downloadable templates & resources",
+                    "Lifetime access + updates",
+                    "Certificate of completion",
+                    "30-day money-back guarantee",
+                  ].map((item, i) => (
                     <li key={i} className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 shrink-0 text-primary" />
                       {item}
@@ -234,7 +282,7 @@ const Index = () => {
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="py-20">
+      <section id="faq" className="border-t bg-muted/30 py-20">
         <div className="container mx-auto px-4">
           <motion.div className="text-center" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
             <h2 className="font-display text-3xl font-bold md:text-4xl">Frequently Asked Questions</h2>
@@ -252,22 +300,18 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Affiliate CTA */}
-      <section className="border-t bg-gradient-to-br from-primary/10 via-accent/30 to-background py-20">
+      {/* Final CTA */}
+      <section className="py-20">
         <div className="container mx-auto px-4 text-center">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeIn}>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground">
-              <DollarSign className="h-4 w-4" />
-              Affiliate Program
-            </div>
-            <h2 className="font-display text-3xl font-bold md:text-4xl">Earn While You Share</h2>
+            <h2 className="font-display text-3xl font-bold md:text-4xl">Ready to Start Earning as a Ghostwriter?</h2>
             <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-              Join our affiliate program and earn 30% commission on every sale. Get your unique referral link, marketing materials, and real-time tracking.
+              Join hundreds of students already writing and earning on web novel platforms. Your first novel could be just weeks away.
             </p>
-            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <Button size="lg" className="gap-2" onClick={() => navigate(affiliateLink)}>
-                <Users className="h-4 w-4" />
-                Become an Affiliate
+            <div className="mt-8">
+              <Button size="lg" className="gap-2 text-base" onClick={() => navigate("/signup")}>
+                Enroll Now — ₦20,000
+                <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           </motion.div>
