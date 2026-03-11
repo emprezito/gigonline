@@ -809,6 +809,50 @@ const AdminDashboard = () => {
                 )}
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="font-display flex items-center gap-2"><Image className="h-5 w-5" /> Testimonial Screenshots</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">Upload screenshots of student testimonials to display on the landing page.</p>
+                <div>
+                  <Label htmlFor="testimonial-upload" className="cursor-pointer">
+                    <div className="flex items-center gap-2 rounded-md border border-dashed border-muted-foreground/30 p-4 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors">
+                      {uploadingTestimonial ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      {uploadingTestimonial ? "Uploading..." : "Click to upload a testimonial screenshot"}
+                    </div>
+                  </Label>
+                  <input
+                    id="testimonial-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleTestimonialUpload(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+                {testimonials.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {testimonials.map((t: any) => (
+                      <div key={t.id} className="relative group rounded-lg overflow-hidden border">
+                        <img src={t.image_url} alt="Testimonial" className="w-full h-auto object-cover" />
+                        <button
+                          onClick={() => deleteTestimonial(t.id, t.image_url)}
+                          className="absolute top-1 right-1 rounded-full bg-destructive p-1 text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {testimonials.length === 0 && (
+                  <p className="text-sm text-muted-foreground italic">No testimonials uploaded yet.</p>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Settings */}
