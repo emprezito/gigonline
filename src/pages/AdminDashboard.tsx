@@ -51,8 +51,47 @@ const AdminDashboard = () => {
   const [dialogOpen, setDialogOpen] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && hasRole("admin")) fetchAllData();
+    if (user && hasRole("admin")) {
+      fetchAllData();
+      fetchTestimonials();
+    }
   }, [user, authLoading]);
+
+  const fetchTestimonials = async () => {
+    const { data } = await supabase.from("testimonial_screenshots").select("*").order("sort_order");
+    setTestimonials(data || []);
+  };
+
+  const handleTestimonialUpload = async (file: File) => {
+    setUploadingTestimonial(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const filePath = `${crypto.randomUUID()}.${fileExt}`;
+      const { error } = await supabase.storage.from("testimonials").upload(filePath, file);
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("testimonials").getPublicUrl(filePath);
+      const maxOrder = testimonials.length > 0 ? Math.max(...testimonials.map((t: any) => t.sort_order)) + 1 : 0;
+      await supabase.from("testimonial_screenshots").insert({ image_url: urlData.publicUrl, sort_order: maxOrder });
+      fetchTestimonials();
+      toast({ title: "Testimonial uploaded" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingTestimonial(false);
+    }
+  };
+
+  const deleteTestimonial = async (id: string, imageUrl: string) => {
+    try {
+      const fileName = imageUrl.split("/").pop();
+      if (fileName) await supabase.storage.from("testimonials").remove([fileName]);
+      await supabase.from("testimonial_screenshots").delete().eq("id", id);
+      fetchTestimonials();
+      toast({ title: "Testimonial deleted" });
+    } catch (err: any) {
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    }
+  };
 
   const fetchAllData = async () => {
     const [coursesRes, affiliatesRes, salesRes, payoutsRes, settingsRes] = await Promise.all([
