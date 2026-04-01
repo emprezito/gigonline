@@ -64,6 +64,23 @@ const AdminDashboard = () => {
     setTestimonials(data || []);
   };
 
+  const fetchCommunityChannels = async () => {
+    const { data } = await (supabase as any).from("channels").select("*").order("sort_order");
+    setCommunityChannels(data || []);
+  };
+
+  const toggleChannelLock = async (id: string, locked: boolean) => {
+    await (supabase as any).from("channels").update({ is_locked: locked }).eq("id", id);
+    fetchCommunityChannels();
+    toast({ title: locked ? "Channel locked" : "Channel unlocked" });
+  };
+
+  const deleteChannel = async (id: string) => {
+    await (supabase as any).from("channels").delete().eq("id", id);
+    fetchCommunityChannels();
+    toast({ title: "Channel deleted" });
+  };
+
   const handleTestimonialUpload = async (file: File) => {
     setUploadingTestimonial(true);
     try {
