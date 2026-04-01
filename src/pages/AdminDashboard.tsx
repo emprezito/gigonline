@@ -356,7 +356,7 @@ const AdminDashboard = () => {
         <h1 className="font-display text-3xl font-bold">Admin Dashboard</h1>
 
         <Tabs defaultValue="overview" className="mt-8">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="courses">Courses</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
@@ -370,6 +370,7 @@ const AdminDashboard = () => {
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="community">Community</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
