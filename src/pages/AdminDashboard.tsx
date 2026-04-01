@@ -55,6 +55,7 @@ const AdminDashboard = () => {
     if (user && hasRole("admin")) {
       fetchAllData();
       fetchTestimonials();
+      fetchCommunityChannels();
     }
   }, [user, authLoading]);
 
