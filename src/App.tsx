@@ -15,6 +15,8 @@ import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import CoursePlayer from "./pages/CoursePlayer";
 import AffiliateDashboard from "./pages/AffiliateDashboard";
+import AffiliateLanding from "./pages/AffiliateLanding";
+import Community from "./pages/Community";
 import AdminDashboard from "./pages/AdminDashboard";
 import { AdminRoute } from "@/components/AdminRoute";
 import ProfileSettings from "./pages/ProfileSettings";
