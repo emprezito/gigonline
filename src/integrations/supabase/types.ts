@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      affiliate_applications: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          promotion_plan: string
+          status: string
+          user_id: string | null
+          whatsapp_number: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          promotion_plan: string
+          status?: string
+          user_id?: string | null
+          whatsapp_number: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          promotion_plan?: string
+          status?: string
+          user_id?: string | null
+          whatsapp_number?: string
+        }
+        Relationships: []
+      }
       affiliates: {
         Row: {
           account_name: string | null
@@ -87,6 +120,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      channels: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_locked: boolean
+          is_read_only: boolean
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_locked?: boolean
+          is_read_only?: boolean
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_locked?: boolean
+          is_read_only?: boolean
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
       }
       courses: {
         Row: {
@@ -229,6 +295,41 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          channel_id: string
+          content: string
+          created_at: string
+          id: string
+          mentioned_user_ids: string[] | null
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          content: string
+          created_at?: string
+          id?: string
+          mentioned_user_ids?: string[] | null
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          mentioned_user_ids?: string[] | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       modules: {
         Row: {
           course_id: string
@@ -257,6 +358,54 @@ export type Database = {
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          channel_id: string
+          created_at: string
+          from_user_id: string
+          id: string
+          is_read: boolean
+          message_id: string
+          message_preview: string
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          from_user_id: string
+          id?: string
+          is_read?: boolean
+          message_id: string
+          message_preview: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          is_read?: boolean
+          message_id?: string
+          message_preview?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
         ]
@@ -568,7 +717,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "student" | "affiliate"
+      app_role: "admin" | "student" | "affiliate" | "moderator"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -696,7 +845,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "student", "affiliate"],
+      app_role: ["admin", "student", "affiliate", "moderator"],
     },
   },
 } as const

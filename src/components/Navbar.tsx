@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PushNotificationToggle } from "@/components/PushNotificationToggle";
 import { Button } from "@/components/ui/button";
-import { Menu, X, GraduationCap } from "lucide-react";
+import { Menu, X, GraduationCap, MessageSquare } from "lucide-react";
 import { useState } from "react";
 
 export const Navbar = () => {
@@ -40,8 +40,11 @@ export const Navbar = () => {
           {user ? (
             <>
               <Button variant="ghost" size="sm" onClick={() => navigate(getDashboardLink())}>Dashboard</Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/community")} className="gap-1.5">
+                <MessageSquare className="h-4 w-4" /> Community
+              </Button>
               {hasRole("affiliate") && (
-                <Button variant="ghost" size="sm" onClick={() => navigate("/affiliate")}>Affiliate</Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate("/affiliate/dashboard")}>Affiliate</Button>
               )}
               <Button variant="outline" size="sm" onClick={handleSignOut}>Sign Out</Button>
             </>
@@ -72,8 +75,11 @@ export const Navbar = () => {
             {user ? (
               <>
                 <Button variant="ghost" size="sm" onClick={() => { navigate(getDashboardLink()); setOpen(false); }}>Dashboard</Button>
+                <Button variant="ghost" size="sm" onClick={() => { navigate("/community"); setOpen(false); }} className="gap-1.5">
+                  <MessageSquare className="h-4 w-4" /> Community
+                </Button>
                 {hasRole("affiliate") && (
-                  <Button variant="ghost" size="sm" onClick={() => { navigate("/affiliate"); setOpen(false); }}>Affiliate</Button>
+                  <Button variant="ghost" size="sm" onClick={() => { navigate("/affiliate/dashboard"); setOpen(false); }}>Affiliate</Button>
                 )}
                 <Button variant="outline" size="sm" onClick={handleSignOut}>Sign Out</Button>
               </>
