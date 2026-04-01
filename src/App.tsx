@@ -46,7 +46,9 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/payment/verify" element={<PaymentVerify />} />
               <Route path="/course/:courseId" element={<CoursePlayer />} />
-              <Route path="/affiliate" element={<AffiliateDashboard />} />
+              <Route path="/affiliate" element={<AffiliateLanding />} />
+              <Route path="/affiliate/dashboard" element={<AffiliateDashboard />} />
+              <Route path="/community" element={<Community />} />
               <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
               <Route path="/settings" element={<ProfileSettings />} />
               <Route path="*" element={<NotFound />} />
