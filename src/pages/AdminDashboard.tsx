@@ -799,7 +799,7 @@ const AdminDashboard = () => {
                         <TableHead>Roles</TableHead>
                         <TableHead>Courses</TableHead>
                         <TableHead>Joined</TableHead>
-                        <TableHead>Last Sign In</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -810,7 +810,7 @@ const AdminDashboard = () => {
                           <TableCell>
                             <div className="flex gap-1 flex-wrap">
                               {u.roles.map((r: string) => (
-                                <Badge key={r} variant={r === "admin" ? "destructive" : r === "affiliate" ? "secondary" : "outline"} className="text-xs">
+                                <Badge key={r} variant={r === "admin" ? "destructive" : r === "moderator" ? "default" : r === "affiliate" ? "secondary" : "outline"} className="text-xs">
                                   {r}
                                 </Badge>
                               ))}
@@ -818,7 +818,31 @@ const AdminDashboard = () => {
                           </TableCell>
                           <TableCell>{u.enrollments}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString() : "Never"}</TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant={u.roles.includes("moderator") ? "destructive" : "outline"}
+                              onClick={async () => {
+                                const hasMod = u.roles.includes("moderator");
+                                try {
+                                  if (hasMod) {
+                                    await supabase.from("user_roles").delete().eq("user_id", u.id).eq("role", "moderator" as any);
+                                    u.roles = u.roles.filter((r: string) => r !== "moderator");
+                                  } else {
+                                    await supabase.from("user_roles").insert({ user_id: u.id, role: "moderator" as any });
+                                    u.roles = [...u.roles, "moderator"];
+                                  }
+                                  setPlatformUsers([...platformUsers]);
+                                  toast({ title: hasMod ? "Moderator removed" : "Moderator assigned" });
+                                } catch {
+                                  toast({ title: "Failed to update role", variant: "destructive" });
+                                }
+                              }}
+                              className="text-xs"
+                            >
+                              {u.roles.includes("moderator") ? "Remove Mod" : "Make Mod"}
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
