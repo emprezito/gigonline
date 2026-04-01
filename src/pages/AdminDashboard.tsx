@@ -40,6 +40,7 @@ const AdminDashboard = () => {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [testimonials, setTestimonials] = useState<any[]>([]);
   const [uploadingTestimonial, setUploadingTestimonial] = useState(false);
+  const [communityChannels, setCommunityChannels] = useState<any[]>([]);
 
   // Form states
   const [courseForm, setCourseForm] = useState({ title: "", description: "", price: 49999, commission_rate: 50, published: false });
