@@ -17,6 +17,7 @@ interface ReplyTarget {
 
 interface Props {
   channelId: string;
+  channelName: string;
   canPost: boolean;
   currentUserId: string;
   profiles: Profile[];
@@ -24,7 +25,7 @@ interface Props {
   onCancelReply: () => void;
 }
 
-export function MessageInput({ channelId, canPost, currentUserId, profiles, replyTo, onCancelReply }: Props) {
+export function MessageInput({ channelId, channelName, canPost, currentUserId, profiles, replyTo, onCancelReply }: Props) {
   const [content, setContent] = useState("");
   const [mentionQuery, setMentionQuery] = useState("");
   const [showMentions, setShowMentions] = useState(false);
@@ -74,7 +75,7 @@ export function MessageInput({ channelId, canPost, currentUserId, profiles, repl
     const isImage = file.type.startsWith("image/");
     const isVideo = file.type.startsWith("video/");
     if (!isImage && !isVideo) return;
-    if (file.size > 10 * 1024 * 1024) return; // 10MB limit
+    if (file.size > 10 * 1024 * 1024) return;
     setMediaFile(file);
     setMediaPreview(URL.createObjectURL(file));
   };
@@ -94,7 +95,6 @@ export function MessageInput({ channelId, canPost, currentUserId, profiles, repl
       let mediaUrl: string | null = null;
       let mediaType: string | null = null;
 
-      // Upload media if present
       if (mediaFile) {
         setUploading(true);
         const ext = mediaFile.name.split(".").pop();
@@ -127,7 +127,7 @@ export function MessageInput({ channelId, canPost, currentUserId, profiles, repl
 
       if (error) throw error;
 
-      // Create notifications for mentioned users
+      // Create in-app notifications for mentioned users
       if (mentionedIds.length > 0 && msg) {
         const notifications = mentionedIds.map((uid: string) => ({
           user_id: uid,
@@ -137,6 +137,19 @@ export function MessageInput({ channelId, canPost, currentUserId, profiles, repl
           message_preview: (trimmed || "[media]").substring(0, 100),
         }));
         await (supabase as any).from("notifications").insert(notifications);
+
+        // Also trigger push notifications for mentioned users
+        try {
+          await supabase.functions.invoke("community-mention-push", {
+            body: {
+              mentionedUserIds: mentionedIds,
+              channelName,
+              messagePreview: (trimmed || "[media]").substring(0, 80),
+            },
+          });
+        } catch {
+          // Push is best-effort, don't block message sending
+        }
       }
 
       setContent("");
