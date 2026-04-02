@@ -301,7 +301,10 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          media_type: string | null
+          media_url: string | null
           mentioned_user_ids: string[] | null
+          reply_to_id: string | null
           user_id: string
         }
         Insert: {
@@ -309,7 +312,10 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           mentioned_user_ids?: string[] | null
+          reply_to_id?: string | null
           user_id: string
         }
         Update: {
@@ -317,7 +323,10 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           mentioned_user_ids?: string[] | null
+          reply_to_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -326,6 +335,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
         ]
