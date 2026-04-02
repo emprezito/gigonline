@@ -41,6 +41,8 @@ const AdminDashboard = () => {
   const [testimonials, setTestimonials] = useState<any[]>([]);
   const [uploadingTestimonial, setUploadingTestimonial] = useState(false);
   const [communityChannels, setCommunityChannels] = useState<any[]>([]);
+  const [channelForm, setChannelForm] = useState({ name: "", category: "", description: "", is_read_only: false, is_locked: false, sort_order: 0 });
+  const [creatingChannel, setCreatingChannel] = useState(false);
 
   // Form states
   const [courseForm, setCourseForm] = useState({ title: "", description: "", price: 49999, commission_rate: 50, published: false });
