@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Trash2, Hash } from "lucide-react";
+import { Trash2, Hash, Reply } from "lucide-react";
 import { MessageInput } from "./MessageInput";
 
 interface Message {
@@ -14,6 +14,9 @@ interface Message {
   content: string;
   mentioned_user_ids: string[];
   created_at: string;
+  reply_to_id: string | null;
+  media_url: string | null;
+  media_type: string | null;
 }
 
 interface Channel {
@@ -46,6 +49,7 @@ const roleBadge = (role: string) => {
 export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [replyTo, setReplyTo] = useState<{ id: string; content: string; user_name: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const currentRoles = getRoles(currentUserId);
   const canModerate = currentRoles.includes("admin") || currentRoles.includes("moderator");
@@ -90,12 +94,29 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
     await (supabase as any).from("messages").delete().eq("id", id);
   };
 
+  const handleReply = useCallback((msg: Message) => {
+    const profile = profileMap[msg.user_id];
+    setReplyTo({
+      id: msg.id,
+      content: msg.content || "[media]",
+      user_name: profile?.full_name || "Unknown",
+    });
+  }, [profileMap]);
+
+  // Build a map for quick reply lookup
+  const messageMap = useMemo(() => {
+    const map: Record<string, Message> = {};
+    messages.forEach((m) => { map[m.id] = m; });
+    return map;
+  }, [messages]);
+
   // Group consecutive messages
   const grouped = useMemo(() => {
     return messages.map((msg, i) => {
       const prev = messages[i - 1];
       const showHeader = !prev || prev.user_id !== msg.user_id ||
-        new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() > 5 * 60 * 1000;
+        new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() > 5 * 60 * 1000 ||
+        !!msg.reply_to_id;
       return { ...msg, showHeader };
     });
   }, [messages]);
@@ -124,6 +145,10 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
               const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
               const canDelete = msg.user_id === currentUserId || canModerate;
 
+              // Reply context
+              const replyMsg = msg.reply_to_id ? messageMap[msg.reply_to_id] : null;
+              const replyProfile = replyMsg ? profileMap[replyMsg.user_id] : null;
+
               return (
                 <div key={msg.id} className={`group flex gap-3 px-2 py-0.5 hover:bg-muted/50 rounded ${msg.showHeader ? "mt-4" : ""}`}>
                   {msg.showHeader ? (
@@ -134,6 +159,14 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
                     <div className="w-9 shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
+                    {/* Reply reference */}
+                    {replyMsg && (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                        <Reply className="h-3 w-3" />
+                        <span className="font-medium">{replyProfile?.full_name || "Unknown"}</span>
+                        <span className="truncate max-w-[200px]">{replyMsg.content || "[media]"}</span>
+                      </div>
+                    )}
                     {msg.showHeader && (
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="font-semibold text-sm">{name}</span>
@@ -143,13 +176,25 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
                         </span>
                       </div>
                     )}
-                    <p className="text-sm break-words whitespace-pre-wrap">{msg.content}</p>
+                    {msg.content && <p className="text-sm break-words whitespace-pre-wrap">{msg.content}</p>}
+                    {/* Media */}
+                    {msg.media_url && msg.media_type === "image" && (
+                      <img src={msg.media_url} alt="" className="mt-1 max-w-xs rounded-lg border cursor-pointer" onClick={() => window.open(msg.media_url!, "_blank")} />
+                    )}
+                    {msg.media_url && msg.media_type === "video" && (
+                      <video src={msg.media_url} controls className="mt-1 max-w-xs rounded-lg border" />
+                    )}
                   </div>
-                  {canDelete && (
-                    <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 h-6 w-6 shrink-0" onClick={() => deleteMessage(msg.id)}>
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  <div className="flex items-start gap-0.5 opacity-0 group-hover:opacity-100 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleReply(msg)}>
+                      <Reply className="h-3.5 w-3.5 text-muted-foreground" />
                     </Button>
-                  )}
+                    {canDelete && (
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteMessage(msg.id)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               );
             })
@@ -164,6 +209,8 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
         canPost={canPost}
         currentUserId={currentUserId}
         profiles={profiles}
+        replyTo={replyTo}
+        onCancelReply={() => setReplyTo(null)}
       />
     </div>
   );
