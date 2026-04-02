@@ -901,7 +901,154 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Settings */}
+          {/* Community */}
+          <TabsContent value="community" className="space-y-6">
+            {/* Create Channel */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-display flex items-center gap-2"><Plus className="h-5 w-5" /> Create Channel</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Channel Name</Label>
+                    <Input placeholder="e.g. general" value={channelForm.name} onChange={(e) => setChannelForm({ ...channelForm, name: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Input placeholder="e.g. Community" value={channelForm.category} onChange={(e) => setChannelForm({ ...channelForm, category: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Sort Order</Label>
+                    <Input type="number" value={channelForm.sort_order} onChange={(e) => setChannelForm({ ...channelForm, sort_order: parseInt(e.target.value) || 0 })} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Description (optional)</Label>
+                  <Input placeholder="A short description" value={channelForm.description} onChange={(e) => setChannelForm({ ...channelForm, description: e.target.value })} />
+                </div>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Switch checked={channelForm.is_read_only} onCheckedChange={(v) => setChannelForm({ ...channelForm, is_read_only: v })} />
+                    Read-only (only admins/mods can post)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Switch checked={channelForm.is_locked} onCheckedChange={(v) => setChannelForm({ ...channelForm, is_locked: v })} />
+                    Locked (hidden from users)
+                  </label>
+                </div>
+                <Button
+                  disabled={!channelForm.name.trim() || !channelForm.category.trim() || creatingChannel}
+                  onClick={async () => {
+                    setCreatingChannel(true);
+                    try {
+                      await (supabase as any).from("channels").insert({
+                        name: channelForm.name.trim(),
+                        category: channelForm.category.trim(),
+                        description: channelForm.description.trim() || null,
+                        is_read_only: channelForm.is_read_only,
+                        is_locked: channelForm.is_locked,
+                        sort_order: channelForm.sort_order,
+                      });
+                      setChannelForm({ name: "", category: "", description: "", is_read_only: false, is_locked: false, sort_order: 0 });
+                      fetchCommunityChannels();
+                      toast({ title: "Channel created" });
+                    } catch (err: any) {
+                      toast({ title: "Error", description: err.message, variant: "destructive" });
+                    } finally {
+                      setCreatingChannel(false);
+                    }
+                  }}
+                  className="gap-2"
+                >
+                  {creatingChannel ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  Create Channel
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Channel List */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-display flex items-center gap-2"><MessageSquare className="h-5 w-5" /> Channels ({communityChannels.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {communityChannels.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No channels yet. Create one above.</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Order</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {communityChannels.map((ch: any) => (
+                        <TableRow key={ch.id}>
+                          <TableCell className="font-medium flex items-center gap-1.5">
+                            <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                            {ch.name}
+                          </TableCell>
+                          <TableCell>{ch.category}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{ch.description || "—"}</TableCell>
+                          <TableCell>{ch.sort_order}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              {ch.is_read_only && <Badge variant="secondary" className="text-xs">Read-only</Badge>}
+                              {ch.is_locked && <Badge variant="destructive" className="text-xs">Locked</Badge>}
+                              {!ch.is_read_only && !ch.is_locked && <Badge variant="outline" className="text-xs">Open</Badge>}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => toggleChannelLock(ch.id, !ch.is_locked)}
+                                className="gap-1 text-xs"
+                              >
+                                {ch.is_locked ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                                {ch.is_locked ? "Unlock" : "Lock"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={async () => {
+                                  await (supabase as any).from("channels").update({ is_read_only: !ch.is_read_only }).eq("id", ch.id);
+                                  fetchCommunityChannels();
+                                  toast({ title: ch.is_read_only ? "Channel is now writable" : "Channel set to read-only" });
+                                }}
+                                className="text-xs"
+                              >
+                                {ch.is_read_only ? "Make Writable" : "Read-only"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => {
+                                  if (confirm(`Delete channel #${ch.name}? All messages will be lost.`)) {
+                                    deleteChannel(ch.id);
+                                  }
+                                }}
+                                className="gap-1 text-xs"
+                              >
+                                <Trash2 className="h-3 w-3" /> Delete
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
           <TabsContent value="settings" className="space-y-6">
             <Card>
               <CardHeader><CardTitle className="font-display">Platform Settings</CardTitle></CardHeader>
