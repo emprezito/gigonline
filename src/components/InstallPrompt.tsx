@@ -15,6 +15,7 @@ export const InstallPrompt = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
@@ -23,43 +24,54 @@ export const InstallPrompt = () => {
     setIsStandalone(standalone);
     if (standalone) return;
 
+    // Don't show inside iframes (e.g. Lovable editor preview)
+    try {
+      if (window.self !== window.top) return;
+    } catch {
+      return;
+    }
+
     const dismissed = localStorage.getItem(DISMISS_KEY);
     if (dismissed && Date.now() - Number(dismissed) < DISMISS_DURATION) return;
 
     const ua = navigator.userAgent;
     const ios = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+    const android = /Android/.test(ua);
     setIsIOS(ios);
-
-    if (ios) {
-      setTimeout(() => setShowPrompt(true), 3000);
-      return;
-    }
+    setIsAndroid(android);
 
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setTimeout(() => setShowPrompt(true), 3000);
+      setShowPrompt(true);
     };
 
     window.addEventListener("beforeinstallprompt", handler);
 
-    // Fallback: show prompt after 5s even if beforeinstallprompt doesn't fire
+    // iOS / fallback (Android browsers that didn't fire the event yet) — show manual instructions after a delay
     const fallbackTimer = setTimeout(() => {
-      setShowPrompt(true);
-    }, 5000);
+      if (ios || android) setShowPrompt(true);
+    }, 3000);
+
+    // Hide if app gets installed
+    const installedHandler = () => setShowPrompt(false);
+    window.addEventListener("appinstalled", installedHandler);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", installedHandler);
       clearTimeout(fallbackTimer);
     };
   }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      setShowPrompt(false);
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") setShowPrompt(false);
+    } catch (err) {
+      console.error("Install prompt error:", err);
     }
     setDeferredPrompt(null);
   };
@@ -101,7 +113,7 @@ export const InstallPrompt = () => {
               <p className="mt-1 text-xs text-muted-foreground">
                 Tap <Share className="inline h-3 w-3" /> then <strong>"Add to Home Screen"</strong> to install.
               </p>
-            ) : (
+            ) : deferredPrompt ? (
               <>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Get quick access from your home screen.
@@ -110,6 +122,10 @@ export const InstallPrompt = () => {
                   Install App
                 </Button>
               </>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Open your browser menu and tap <strong>"Install app"</strong> or <strong>"Add to Home Screen"</strong>.
+              </p>
             )}
           </div>
         </div>
