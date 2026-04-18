@@ -86,6 +86,8 @@ export function MessageInput({ channelId, channelName, canPost, currentUserId, p
 
   const handleChange = (value: string) => {
     setContent(value);
+    if (value.trim().length > 0) broadcastTyping();
+    else stopTyping();
     const atMatch = value.match(/@(\w*)$/);
     if (atMatch) {
       setMentionQuery(atMatch[1]);
