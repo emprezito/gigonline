@@ -143,6 +143,95 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
+  // Fetch read receipts for this channel
+  useEffect(() => {
+    (supabase as any)
+      .from("channel_reads")
+      .select("user_id, last_read_message_id, last_read_at")
+      .eq("channel_id", channel.id)
+      .then(({ data }: any) => {
+        setReads(data || []);
+      });
+  }, [channel.id]);
+
+  // Real-time subscription for read receipts
+  useEffect(() => {
+    const sub = supabase
+      .channel(`reads:${channel.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "channel_reads", filter: `channel_id=eq.${channel.id}` }, (payload) => {
+        const newRow = payload.new as any;
+        const oldRow = payload.old as any;
+        setReads((prev) => {
+          if (payload.eventType === "DELETE") {
+            return prev.filter((r) => r.user_id !== oldRow.user_id);
+          }
+          const without = prev.filter((r) => r.user_id !== newRow.user_id);
+          return [...without, { user_id: newRow.user_id, last_read_message_id: newRow.last_read_message_id, last_read_at: newRow.last_read_at }];
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, [channel.id]);
+
+  // Mark channel as read whenever new messages arrive (and tab is visible)
+  useEffect(() => {
+    if (messages.length === 0) return;
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    const lastMsg = messages[messages.length - 1];
+    // Don't mark own message as "read by self" beyond the bookkeeping
+    (supabase as any)
+      .from("channel_reads")
+      .upsert(
+        {
+          user_id: currentUserId,
+          channel_id: channel.id,
+          last_read_message_id: lastMsg.id,
+          last_read_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,channel_id" }
+      )
+      .then(() => {});
+  }, [messages.length, channel.id, currentUserId]);
+
+  // Real-time typing indicator (broadcast)
+  useEffect(() => {
+    const ch = supabase.channel(`typing:${channel.id}`, {
+      config: { broadcast: { self: false } },
+    });
+    ch.on("broadcast", { event: "typing" }, ({ payload }) => {
+      const { user_id, typing } = payload as { user_id: string; typing: boolean };
+      if (user_id === currentUserId) return;
+      setTypingUsers((prev) => {
+        const next = { ...prev };
+        if (typing) {
+          next[user_id] = Date.now() + 4000;
+        } else {
+          delete next[user_id];
+        }
+        return next;
+      });
+    });
+    ch.subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [channel.id, currentUserId]);
+
+  // Sweep stale typing entries every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTypingUsers((prev) => {
+        const now = Date.now();
+        const next: Record<string, number> = {};
+        let changed = false;
+        for (const [uid, expiry] of Object.entries(prev)) {
+          if (expiry > now) next[uid] = expiry;
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const deleteMessage = async (id: string) => {
     await (supabase as any).from("messages").delete().eq("id", id);
   };
