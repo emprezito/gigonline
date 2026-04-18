@@ -201,6 +201,7 @@ export function MessageInput({ channelId, channelName, canPost, currentUserId, p
       setContent("");
       clearMedia();
       onCancelReply();
+      stopTyping();
     } catch (err) {
       console.error("Failed to send message:", err);
     } finally {
