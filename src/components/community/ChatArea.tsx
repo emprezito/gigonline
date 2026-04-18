@@ -9,6 +9,9 @@ import { cn } from "@/lib/utils";
 import { MessageInput } from "./MessageInput";
 import { EmojiPicker } from "./EmojiPicker";
 import { MessageReactions } from "./MessageReactions";
+import { TypingIndicator } from "./TypingIndicator";
+import { SeenAvatars } from "./SeenAvatars";
+import { SwipeableMessage } from "./SwipeableMessage";
 
 interface Message {
   id: string;
