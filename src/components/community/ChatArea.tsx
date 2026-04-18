@@ -9,6 +9,9 @@ import { cn } from "@/lib/utils";
 import { MessageInput } from "./MessageInput";
 import { EmojiPicker } from "./EmojiPicker";
 import { MessageReactions } from "./MessageReactions";
+import { TypingIndicator } from "./TypingIndicator";
+import { SeenAvatars } from "./SeenAvatars";
+import { SwipeableMessage } from "./SwipeableMessage";
 
 interface Message {
   id: string;
@@ -60,6 +63,8 @@ const roleBadge = (role: string) => {
 export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [reactions, setReactions] = useState<Reaction[]>([]);
+  const [reads, setReads] = useState<Array<{ user_id: string; last_read_message_id: string | null; last_read_at: string }>>([]);
+  const [typingUsers, setTypingUsers] = useState<Record<string, number>>({}); // user_id -> expiry timestamp
   const [loading, setLoading] = useState(true);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; user_name: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -137,6 +142,95 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  // Fetch read receipts for this channel
+  useEffect(() => {
+    (supabase as any)
+      .from("channel_reads")
+      .select("user_id, last_read_message_id, last_read_at")
+      .eq("channel_id", channel.id)
+      .then(({ data }: any) => {
+        setReads(data || []);
+      });
+  }, [channel.id]);
+
+  // Real-time subscription for read receipts
+  useEffect(() => {
+    const sub = supabase
+      .channel(`reads:${channel.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "channel_reads", filter: `channel_id=eq.${channel.id}` }, (payload) => {
+        const newRow = payload.new as any;
+        const oldRow = payload.old as any;
+        setReads((prev) => {
+          if (payload.eventType === "DELETE") {
+            return prev.filter((r) => r.user_id !== oldRow.user_id);
+          }
+          const without = prev.filter((r) => r.user_id !== newRow.user_id);
+          return [...without, { user_id: newRow.user_id, last_read_message_id: newRow.last_read_message_id, last_read_at: newRow.last_read_at }];
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, [channel.id]);
+
+  // Mark channel as read whenever new messages arrive (and tab is visible)
+  useEffect(() => {
+    if (messages.length === 0) return;
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    const lastMsg = messages[messages.length - 1];
+    // Don't mark own message as "read by self" beyond the bookkeeping
+    (supabase as any)
+      .from("channel_reads")
+      .upsert(
+        {
+          user_id: currentUserId,
+          channel_id: channel.id,
+          last_read_message_id: lastMsg.id,
+          last_read_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,channel_id" }
+      )
+      .then(() => {});
+  }, [messages.length, channel.id, currentUserId]);
+
+  // Real-time typing indicator (broadcast)
+  useEffect(() => {
+    const ch = supabase.channel(`typing:${channel.id}`, {
+      config: { broadcast: { self: false } },
+    });
+    ch.on("broadcast", { event: "typing" }, ({ payload }) => {
+      const { user_id, typing } = payload as { user_id: string; typing: boolean };
+      if (user_id === currentUserId) return;
+      setTypingUsers((prev) => {
+        const next = { ...prev };
+        if (typing) {
+          next[user_id] = Date.now() + 4000;
+        } else {
+          delete next[user_id];
+        }
+        return next;
+      });
+    });
+    ch.subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [channel.id, currentUserId]);
+
+  // Sweep stale typing entries every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTypingUsers((prev) => {
+        const now = Date.now();
+        const next: Record<string, number> = {};
+        let changed = false;
+        for (const [uid, expiry] of Object.entries(prev)) {
+          if (expiry > now) next[uid] = expiry;
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const deleteMessage = async (id: string) => {
     await (supabase as any).from("messages").delete().eq("id", id);
@@ -232,7 +326,21 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
           ) : grouped.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-8">No messages yet. Be the first to say something!</p>
           ) : (
-            grouped.map((msg) => {
+            (() => {
+              // Find the latest own message id (where seen receipts get attached)
+              let lastOwnId: string | null = null;
+              for (let i = messages.length - 1; i >= 0; i--) {
+                if (messages[i].user_id === currentUserId) { lastOwnId = messages[i].id; break; }
+              }
+              const lastOwnIndex = lastOwnId ? messages.findIndex((m) => m.id === lastOwnId) : -1;
+              const lastOwnTime = lastOwnIndex >= 0 ? new Date(messages[lastOwnIndex].created_at).getTime() : 0;
+              const seenByUserIds = lastOwnId
+                ? reads
+                    .filter((r) => r.user_id !== currentUserId && new Date(r.last_read_at).getTime() >= lastOwnTime)
+                    .map((r) => r.user_id)
+                : [];
+
+              return grouped.map((msg) => {
               const isOwn = msg.user_id === currentUserId;
               const profile = profileMap[msg.user_id];
               const roles = getRoles(msg.user_id);
@@ -241,6 +349,7 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
               const canDelete = isOwn || canModerate;
               const canEdit = isOwn;
               const isEditing = editingId === msg.id;
+              const isLastOwn = msg.id === lastOwnId;
 
               const replyMsg = msg.reply_to_id ? messageMap[msg.reply_to_id] : null;
               const replyProfile = replyMsg ? profileMap[replyMsg.user_id] : null;
@@ -260,8 +369,8 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
                   );
 
               return (
+                <SwipeableMessage key={msg.id} isOwn={isOwn} onReply={() => handleReply(msg)}>
                 <div
-                  key={msg.id}
                   className={cn(
                     "group flex items-end gap-2",
                     isOwn ? "flex-row-reverse" : "flex-row",
@@ -390,13 +499,25 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
                         {msg.edited_at && <span className="italic ml-1">· edited</span>}
                       </span>
                     )}
+
+                    {/* Read receipts: show on the last own message */}
+                    {isOwn && isLastOwn && seenByUserIds.length > 0 && (
+                      <SeenAvatars userIds={seenByUserIds} profileMap={profileMap} align="right" />
+                    )}
                   </div>
                 </div>
+                </SwipeableMessage>
               );
-            })
+            });
+            })()
           )}
           <div ref={bottomRef} />
         </div>
+        {/* Typing indicator pinned just above the input */}
+        <TypingIndicator
+          typingUsers={Object.keys(typingUsers).map((user_id) => ({ user_id }))}
+          profileMap={profileMap}
+        />
       </ScrollArea>
 
       {/* Message input */}

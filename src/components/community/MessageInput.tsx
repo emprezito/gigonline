@@ -1,5 +1,6 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Send, ImagePlus, X, Reply } from "lucide-react";
 
@@ -35,6 +36,49 @@ export function MessageInput({ channelId, channelName, canPost, currentUserId, p
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const typingChannelRef = useRef<RealtimeChannel | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTypingRef = useRef(false);
+
+  // Set up typing broadcast channel
+  useEffect(() => {
+    const ch = supabase.channel(`typing:${channelId}`, {
+      config: { broadcast: { self: false } },
+    });
+    ch.subscribe();
+    typingChannelRef.current = ch;
+    return () => {
+      // Send stop on unmount
+      ch.send({ type: "broadcast", event: "typing", payload: { user_id: currentUserId, typing: false } });
+      supabase.removeChannel(ch);
+      typingChannelRef.current = null;
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      isTypingRef.current = false;
+    };
+  }, [channelId, currentUserId]);
+
+  const broadcastTyping = useCallback(() => {
+    const ch = typingChannelRef.current;
+    if (!ch) return;
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      ch.send({ type: "broadcast", event: "typing", payload: { user_id: currentUserId, typing: true } });
+    }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      isTypingRef.current = false;
+      ch.send({ type: "broadcast", event: "typing", payload: { user_id: currentUserId, typing: false } });
+    }, 3000);
+  }, [currentUserId]);
+
+  const stopTyping = useCallback(() => {
+    const ch = typingChannelRef.current;
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (isTypingRef.current && ch) {
+      isTypingRef.current = false;
+      ch.send({ type: "broadcast", event: "typing", payload: { user_id: currentUserId, typing: false } });
+    }
+  }, [currentUserId]);
 
   const filteredProfiles = mentionQuery
     ? profiles.filter((p) => p.id !== currentUserId && p.full_name?.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 8)
@@ -42,6 +86,8 @@ export function MessageInput({ channelId, channelName, canPost, currentUserId, p
 
   const handleChange = (value: string) => {
     setContent(value);
+    if (value.trim().length > 0) broadcastTyping();
+    else stopTyping();
     const atMatch = value.match(/@(\w*)$/);
     if (atMatch) {
       setMentionQuery(atMatch[1]);
@@ -155,6 +201,7 @@ export function MessageInput({ channelId, channelName, canPost, currentUserId, p
       setContent("");
       clearMedia();
       onCancelReply();
+      stopTyping();
     } catch (err) {
       console.error("Failed to send message:", err);
     } finally {

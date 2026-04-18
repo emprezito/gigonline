@@ -121,6 +121,30 @@ export type Database = {
           },
         ]
       }
+      channel_reads: {
+        Row: {
+          channel_id: string
+          id: string
+          last_read_at: string
+          last_read_message_id: string | null
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          id?: string
+          last_read_at?: string
+          last_read_message_id?: string | null
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          id?: string
+          last_read_at?: string
+          last_read_message_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       channels: {
         Row: {
           category: string
