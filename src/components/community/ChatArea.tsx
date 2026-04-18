@@ -326,7 +326,21 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
           ) : grouped.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-8">No messages yet. Be the first to say something!</p>
           ) : (
-            grouped.map((msg) => {
+            (() => {
+              // Find the latest own message id (where seen receipts get attached)
+              let lastOwnId: string | null = null;
+              for (let i = messages.length - 1; i >= 0; i--) {
+                if (messages[i].user_id === currentUserId) { lastOwnId = messages[i].id; break; }
+              }
+              const lastOwnIndex = lastOwnId ? messages.findIndex((m) => m.id === lastOwnId) : -1;
+              const lastOwnTime = lastOwnIndex >= 0 ? new Date(messages[lastOwnIndex].created_at).getTime() : 0;
+              const seenByUserIds = lastOwnId
+                ? reads
+                    .filter((r) => r.user_id !== currentUserId && new Date(r.last_read_at).getTime() >= lastOwnTime)
+                    .map((r) => r.user_id)
+                : [];
+
+              return grouped.map((msg) => {
               const isOwn = msg.user_id === currentUserId;
               const profile = profileMap[msg.user_id];
               const roles = getRoles(msg.user_id);
@@ -335,6 +349,7 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
               const canDelete = isOwn || canModerate;
               const canEdit = isOwn;
               const isEditing = editingId === msg.id;
+              const isLastOwn = msg.id === lastOwnId;
 
               const replyMsg = msg.reply_to_id ? messageMap[msg.reply_to_id] : null;
               const replyProfile = replyMsg ? profileMap[replyMsg.user_id] : null;
