@@ -499,13 +499,25 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
                         {msg.edited_at && <span className="italic ml-1">· edited</span>}
                       </span>
                     )}
+
+                    {/* Read receipts: show on the last own message */}
+                    {isOwn && isLastOwn && seenByUserIds.length > 0 && (
+                      <SeenAvatars userIds={seenByUserIds} profileMap={profileMap} align="right" />
+                    )}
                   </div>
                 </div>
+                </SwipeableMessage>
               );
-            })
+            });
+            })()
           )}
           <div ref={bottomRef} />
         </div>
+        {/* Typing indicator pinned just above the input */}
+        <TypingIndicator
+          typingUsers={Object.keys(typingUsers).map((user_id) => ({ user_id }))}
+          profileMap={profileMap}
+        />
       </ScrollArea>
 
       {/* Message input */}
