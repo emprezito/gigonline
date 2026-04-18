@@ -369,8 +369,8 @@ export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props
                   );
 
               return (
+                <SwipeableMessage key={msg.id} isOwn={isOwn} onReply={() => handleReply(msg)}>
                 <div
-                  key={msg.id}
                   className={cn(
                     "group flex items-end gap-2",
                     isOwn ? "flex-row-reverse" : "flex-row",
