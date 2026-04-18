@@ -63,6 +63,8 @@ const roleBadge = (role: string) => {
 export function ChatArea({ channel, profileMap, getRoles, currentUserId }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [reactions, setReactions] = useState<Reaction[]>([]);
+  const [reads, setReads] = useState<Array<{ user_id: string; last_read_message_id: string | null; last_read_at: string }>>([]);
+  const [typingUsers, setTypingUsers] = useState<Record<string, number>>({}); // user_id -> expiry timestamp
   const [loading, setLoading] = useState(true);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; user_name: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
